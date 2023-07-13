@@ -915,8 +915,47 @@ def nodes_and_elements(file_name, type_num):
             else:
                 continue
 
+def deformation_gradient(X, x):
+    Fdef = np.array([
+        [(x[0] - X[0])/X[0], (x[1] - X[1])/X[0], (x[2] - X[2])/X[0]],
+        [(x[0] - X[0])/X[1], (x[1] - X[1])/X[1], (x[2] - X[2])/X[1]],
+        [(x[0] - X[0])/X[2], (x[2] - X[2])/X[2], (x[2] - X[2])/X[2]]
+    ])
+    Cgre = Fdef.T * Fdef
+    return Fdef, Cgre
+
+def ref_B_mat(X_ele, x_ele, delPhi, dim=3, n_el_n=10):
+    Bmat = np.zeros((6, 30))
+
+    # Jacobian
+    jac   = delPhi * X_ele
+    detJ  = jac.det()
+    b_sub = jac.inv() * delPhi
+
+    # B Matrix
+    b_mat = sym.zeros(6,dim*n_el_n)
+    for r, c in enumerate(range(0, dim*n_el_n, dim)):
+        # [δφ/δx,      0,      0] 
+        b_mat[0, c]   = b_sub[0, r]
+        # [    0,  δφ/δy,      0]
+        b_mat[1, c+1] = b_sub[1, r]
+        # [    0,      0,  δφ/δz]
+        b_mat[2, c+2] = b_sub[2, r]
+        # [δφ/δy,  δφ/δx,      0]
+        b_mat[3, c]   = b_sub[1, r]
+        b_mat[3, c+1] = b_sub[0, r]
+        # [    0,  δφ/δz,  δφ/δy]
+        b_mat[4, c+1] = b_sub[2, r]
+        b_mat[4, c+2] = b_sub[1, r]
+        # [δφ/δz,      0,  δφ/δx]  
+        b_mat[5, c]   = b_sub[2, r]
+        b_mat[5, c+2] = b_sub[0, r] 
+
+    return Bmat, detJ
+
 def constitutive_eqs(con_type, c_vals, C):
     # Mooney Rivlin
+    # W = c1(I1 - 3) + c2(I2-3)
     if con_type == 0:
         # Derivatives of Energy in terms of Invariants
         # First Order
@@ -928,25 +967,51 @@ def constitutive_eqs(con_type, c_vals, C):
         return sPK, dMo
 
 def second_piola(dWdI, C):
+    Jc = (C.det())^(0.5)
     sPK = np.zeros((1,6))
     diracD = np.eye(3)
     # Stress Indexes
     ij = np.array([[1,1], [2,2], [3,3], [1,2], [2,3], [1,3]])
+    invC = C.inv()
     # Fill 2ndPK
     for i in range(0, 6, 1):
-        delIdelC = [diracD[ij[i,0] * ij[i,1]],
-                    np.trace(C) - C[ij[i,0], ij[i,1]],
-                    0.5 * (C.det())^(0.5) * C.inv()[ij[i,0], ij[i,1]]]
+        
+        delIdelC = [diracD[ij[i,0], ij[i,1]],
+                    np.trace(C) * diracD[ij[i,0], ij[i,1]] - C[ij[i,0], ij[i,1]],
+                    0.5 * Jc * invC[ij[i,0], ij[i,1]]]
         sPk_i = delIdelC * dWdI.T 
-        sPK[i] = 2 * sPk_i[0]
+        sPK[i] = 2 * sPk_i
     return sPK
 
 def elastic_moduli(dWdI, ddWdII, C):
+    Jc = (C.det())^(0.5)
     sPK = np.zeros((1,6))
-    diracD = np.eye(3)
+    dd = np.eye(3)
+    invC = C.inv()
+    moduli = np.zeros((6,6))
     # Stress Indexes
     ij = np.array([[1,1], [2,2], [3,3], [1,2], [2,3], [1,3]])
-    return None
+    for r in range(0, 6, 1):
+        term1 = 4*[dd[ij[r,0], ij[r,1]],
+                    np.trace(C) * dd[ij[r,0], ij[r,1]] - C[ij[r,0], ij[r,1]],
+                    0.5 * Jc * invC[ij[r,0], ij[r,1]]] * ddWdII
+        term2 = [4*dWdI[0], dWdI[0]]
+        for c in range(0, 6, 1):
+            term3 = [dd[ij[c,0], ij[c,1]],
+                    np.trace(C) * dd[ij[c,0], ij[c,1]] - C[ij[c,0], ij[c,1]],
+                    0.5 * Jc * invC[ij[c,0], ij[c,1]]
+                    ].T
+            lil_c = 0.5*(invC[ij[r,0], ij[c,0]] * invC[ij[r,1], ij[c,1]] +
+                         invC[ij[r,0], ij[c,1]] * invC[ij[r,1], ij[c,0]])
+            term4 = [dd[ij[r,0], ij[r,1]] * dd[ij[c,0], ij[c,1]] - 
+                     0.5 * (dd[ij[r,0], ij[c,0]] * dd[ij[r,1], ij[c,1]] +
+                             dd[ij[r,0], ij[c,1]] * dd[ij[r,1], ij[c,0]]),
+                     Jc * (invC[ij[r,0], ij[r,1]] * invC[ij[c,0], ij[c,1]] -
+                           2*lil_c)
+                    ]
+            moduli[r, c] = term1 * term3 + term4 * term2
+    
+    return moduli
 
 # u         = np.loadtxt("output_files/u_" + FILE_NAME + ".text", dtype=float)
 # k_gl      = np.loadtxt("output_files/k_" + FILE_NAME + ".text", dtype=float)
