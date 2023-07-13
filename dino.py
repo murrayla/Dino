@@ -871,7 +871,8 @@ def nodes_and_elements(file_name, type_num):
 
     # Nodes 
     # Create a file to write to: gmsh2iron.node
-    node_file = open('gmsh2iron.nodes', 'w')
+    save_name = 'GitHub/Dino/' + file_name.split('gmsh_')[1].split('.msh')[0]
+    node_file = open(save_name + '_cvt2dino.nodes', 'w')
     node_file.write(nodes_list[0] + "\n")
     # Loop through nodes and blocks
     node_positions = dict()
@@ -893,7 +894,7 @@ def nodes_and_elements(file_name, type_num):
 
     # Elements
     # Create a file to store the element information: gmsh2iron.ele
-    element_file = open('gmsh2iron.ele', 'w')
+    element_file = open(save_name + '_cvt2dino.ele', 'w')
     element_file.write(elements_list[0] + "\n")
     # Set Element Types
     types = {type_num: type_name[type_num].strip()}
@@ -935,21 +936,31 @@ def ref_B_mat(X_ele, x_ele, delPhi, dim=3, n_el_n=10):
     # B Matrix
     b_mat = sym.zeros(6,dim*n_el_n)
     for r, c in enumerate(range(0, dim*n_el_n, dim)):
-        # [δφ/δx,      0,      0] 
-        b_mat[0, c]   = b_sub[0, r]
-        # [    0,  δφ/δy,      0]
-        b_mat[1, c+1] = b_sub[1, r]
-        # [    0,      0,  δφ/δz]
-        b_mat[2, c+2] = b_sub[2, r]
-        # [δφ/δy,  δφ/δx,      0]
-        b_mat[3, c]   = b_sub[1, r]
-        b_mat[3, c+1] = b_sub[0, r]
-        # [    0,  δφ/δz,  δφ/δy]
-        b_mat[4, c+1] = b_sub[2, r]
-        b_mat[4, c+2] = b_sub[1, r]
-        # [δφ/δz,      0,  δφ/δx]  
-        b_mat[5, c]   = b_sub[2, r]
-        b_mat[5, c+2] = b_sub[0, r] 
+        Fdef, _ = deformation_gradient(X_ele[r], x_ele[r])
+        # [F11φα,1 F21φα,1 F31φα,1] 
+        b_mat[0, c] = Fdef[0,0] * b_sub[0, r]
+        b_mat[0, c+1] = Fdef[1,0] * b_sub[0, r]
+        b_mat[0, c+2] = Fdef[2,0] * b_sub[0, r]
+        # [F12φα,2 F22φα,2 F32φα,2]
+        b_mat[1, c] = Fdef[0,1] * b_sub[1, r]
+        b_mat[1, c+1] = Fdef[1,1] * b_sub[1, r]
+        b_mat[1, c+2] = Fdef[2,1] * b_sub[1, r]
+        # [F13φα,3 F23φα,3 F33φα,3]
+        b_mat[2, c] = Fdef[0,2] * b_sub[2, r]
+        b_mat[2, c+1] = Fdef[1,2] * b_sub[2, r]
+        b_mat[2, c+2] = Fdef[2,2] * b_sub[2, r]
+        # [F11φα,2 + F12φα,1 F21φα,2 + F22φα,1 F31φα,2 + F32φα,1]
+        b_mat[3, c] = Fdef[0,0] * b_sub[1, r] + Fdef[0,1] * b_sub[0, r]
+        b_mat[3, c+1] = Fdef[1,0] * b_sub[1, r] + Fdef[1,1] * b_sub[0, r]
+        b_mat[3, c+2] = Fdef[2,0] * b_sub[1, r] + Fdef[2,1] * b_sub[0, r]
+        # [F12φα,3 + F13φα,2 F22φα,3 + F23φα,2 F32φα,3 + F33φα,2]
+        b_mat[4, c] = Fdef[0,1] * b_sub[2, r] + Fdef[0,2] * b_sub[1, r]
+        b_mat[4, c+1] = Fdef[1,1] * b_sub[2, r] + Fdef[1,2] * b_sub[1, r]
+        b_mat[4, c+2] = Fdef[2,1] * b_sub[2, r] + Fdef[2,2] * b_sub[1, r]
+        # [F13φα,1 + F11φα,3 F23φα,1 + F21φα,3 F33φα,1 + F31φα,3]  
+        b_mat[5, c] = Fdef[0,2] * b_sub[0, r] + Fdef[0,0] * b_sub[2, r]
+        b_mat[5, c+1] = Fdef[1,2] * b_sub[0, r] + Fdef[1,0] * b_sub[2, r]
+        b_mat[5, c+2] = Fdef[2,2] * b_sub[0, r] + Fdef[2,0] * b_sub[2, r]
 
     return Bmat, detJ
 
@@ -967,50 +978,53 @@ def constitutive_eqs(con_type, c_vals, C):
         return sPK, dMo
 
 def second_piola(dWdI, C):
-    Jc = (C.det())^(0.5)
-    sPK = np.zeros((1,6))
+    Jc = (np.linalg.det(C))**(0.5)
+    sPK = np.zeros(6)
     diracD = np.eye(3)
     # Stress Indexes
-    ij = np.array([[1,1], [2,2], [3,3], [1,2], [2,3], [1,3]])
-    invC = C.inv()
+    ij = np.array([[0,0], [1,1], [2,2], [0,1], [1,2], [0,2]])
+    invC = np.linalg.inv(C)
     # Fill 2ndPK
-    for i in range(0, 6, 1):
-        
+    for i in range(0, 6, 1): 
         delIdelC = [diracD[ij[i,0], ij[i,1]],
                     np.trace(C) * diracD[ij[i,0], ij[i,1]] - C[ij[i,0], ij[i,1]],
                     0.5 * Jc * invC[ij[i,0], ij[i,1]]]
-        sPk_i = delIdelC * dWdI.T 
+        sPk_i = np.matmul(delIdelC, np.array(dWdI))
         sPK[i] = 2 * sPk_i
     return sPK
 
 def elastic_moduli(dWdI, ddWdII, C):
-    Jc = (C.det())^(0.5)
-    sPK = np.zeros((1,6))
+    Jc = (np.linalg.det(C))**(0.5)
+    sPK = np.zeros(6)
     dd = np.eye(3)
-    invC = C.inv()
+    invC = np.linalg.inv(C)
     moduli = np.zeros((6,6))
     # Stress Indexes
-    ij = np.array([[1,1], [2,2], [3,3], [1,2], [2,3], [1,3]])
+    ij = np.array([[0,0], [1,1], [2,2], [0,1], [1,2], [0,2]])
     for r in range(0, 6, 1):
-        term1 = 4*[dd[ij[r,0], ij[r,1]],
-                    np.trace(C) * dd[ij[r,0], ij[r,1]] - C[ij[r,0], ij[r,1]],
-                    0.5 * Jc * invC[ij[r,0], ij[r,1]]] * ddWdII
+        term1 = 4 * np.matmul(
+            [dd[ij[r,0], ij[r,1]],
+             np.trace(C) * dd[ij[r,0], ij[r,1]] - C[ij[r,0], ij[r,1]],
+             0.5 * Jc * invC[ij[r,0], ij[r,1]]
+            ], ddWdII
+        )
         term2 = [4*dWdI[0], dWdI[0]]
         for c in range(0, 6, 1):
-            term3 = [dd[ij[c,0], ij[c,1]],
-                    np.trace(C) * dd[ij[c,0], ij[c,1]] - C[ij[c,0], ij[c,1]],
-                    0.5 * Jc * invC[ij[c,0], ij[c,1]]
-                    ].T
-            lil_c = 0.5*(invC[ij[r,0], ij[c,0]] * invC[ij[r,1], ij[c,1]] +
-                         invC[ij[r,0], ij[c,1]] * invC[ij[r,1], ij[c,0]])
+            term3 = np.transpose(
+                [dd[ij[c,0], ij[c,1]],
+                 np.trace(C) * dd[ij[c,0], ij[c,1]] - C[ij[c,0], ij[c,1]],
+                 0.5 * Jc * invC[ij[c,0], ij[c,1]]
+                ]
+            )
+            lil_c = 0.5 * (invC[ij[r,0], ij[c,0]] * invC[ij[r,1], ij[c,1]] +
+                           invC[ij[r,0], ij[c,1]] * invC[ij[r,1], ij[c,0]])
             term4 = [dd[ij[r,0], ij[r,1]] * dd[ij[c,0], ij[c,1]] - 
                      0.5 * (dd[ij[r,0], ij[c,0]] * dd[ij[r,1], ij[c,1]] +
                              dd[ij[r,0], ij[c,1]] * dd[ij[r,1], ij[c,0]]),
                      Jc * (invC[ij[r,0], ij[r,1]] * invC[ij[c,0], ij[c,1]] -
                            2*lil_c)
-                    ]
-            moduli[r, c] = term1 * term3 + term4 * term2
-    
+            ]
+            moduli[r, c] = np.matmul(term1, term3) + np.matmul(term4, term2)
     return moduli
 
 # u         = np.loadtxt("output_files/u_" + FILE_NAME + ".text", dtype=float)
@@ -1029,3 +1043,40 @@ def elastic_moduli(dWdI, ddWdII, C):
 # plot_eps(u, coords, strains, np_nodes, np_eles)
 
 # post_calc(k_gl, np_nodes, np_eles, phi, delPhi)
+
+# nodes_and_elements("GitHub/Dino/gmsh_cubeTest.msh", 11)
+# dim, n_el_n, sym_vars, phi, delPhi = element_assign(el_type=1, el_order=1)
+# nodes = open("GitHub/Dino/cubeTest_cvt2dino.nodes", 'r')
+# elems = open("GitHub/Dino/cubeTest_cvt2dino.ele", 'r')
+
+# # Store Node and Element Data
+# nodes_list = list()
+# elements_list = list()
+# for line in nodes:
+#     nodes_list.append(line.strip().replace('\t', ' ').split(' '))
+# for line in elems:
+#     elements_list.append(line.strip().replace('\t', ' ').split(' '))
+# np_nodes  = np.array(nodes_list[1:])
+# np_nodes  = np_nodes.astype(float)
+# np_eles   = np.array(elements_list[1:])
+# np_eles   = np_eles[:, 3:].astype(int)
+
+# # Determine Parameters
+# n_ele = len(np_eles[:, 0])
+# n_n = int(len(np_nodes[:, 0]))
+
+# coords = np.zeros((n_el_n, dim))
+# rc = np_eles[0, :]
+# np_nodes_idx = np_nodes[:, 0]
+# for i, local_node in enumerate(rc):
+#     node_indices = np.where(np_nodes_idx == local_node)[0]
+#     coords[i] = np_nodes[node_indices, 1:dim+1][0]
+
+# Fdef, Cgre = deformation_gradient(coords[0], coords[0])
+
+# Cgre = np.array([[1,0,0],[0,1,0],[0,0,1]])
+
+# sPK, dMo = constitutive_eqs(0, [2, 3, 50], Cgre)
+
+# print(sPK)
+# print(dMo)

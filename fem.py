@@ -25,7 +25,7 @@ NUM_PROCESSES = 6
 def main():
     ## SETUP ##
     # Define Interpolation
-    dim, n_el_n, sym_vars, phi, delPhi = dino.element_assign(el_type=ELEMENT_ORDER, el_order=ELEMENT_ORDER)
+    dim, n_el_n, sym_vars, phi, delPhi = dino.element_assign(el_type=ELEMENT_TYPE, el_order=ELEMENT_ORDER)
     we, gp = dino.gauss_num_int(el_type=ELEMENT_TYPE, order=GAUSS_ORDER)
 
     # Intake Mesh

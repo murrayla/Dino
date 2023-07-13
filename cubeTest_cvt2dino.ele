@@ -1,0 +1,25 @@
+27 68 1 68
+10-node-second-order-tetrahedron	1	45	46	41	36	31	51	52	53	54	55	56	
+10-node-second-order-tetrahedron	1	46	31	41	36	21	56	52	55	57	58	59	
+10-node-second-order-tetrahedron	1	47	41	46	26	31	51	60	61	56	62	54	
+10-node-second-order-tetrahedron	1	48	31	26	41	21	62	61	56	57	59	63	
+10-node-second-order-tetrahedron	1	49	46	5	26	6	48	29	60	47	30	15	
+10-node-second-order-tetrahedron	1	50	36	8	46	7	40	49	53	39	50	19	
+10-node-second-order-tetrahedron	1	51	21	26	1	2	63	28	23	22	9	27	
+10-node-second-order-tetrahedron	1	52	36	4	41	8	37	43	52	40	45	18	
+10-node-second-order-tetrahedron	1	53	46	8	41	5	49	45	51	48	44	20	
+10-node-second-order-tetrahedron	1	54	5	1	41	26	13	42	44	29	61	28	
+10-node-second-order-tetrahedron	1	55	41	1	4	21	42	12	43	59	24	23	
+10-node-second-order-tetrahedron	1	56	7	6	46	31	17	47	50	35	54	34	
+10-node-second-order-tetrahedron	1	57	3	36	4	21	38	37	11	25	24	58	
+10-node-second-order-tetrahedron	1	58	31	36	7	3	55	39	35	32	16	38	
+10-node-second-order-tetrahedron	1	59	31	6	26	2	34	30	62	33	27	14	
+10-node-second-order-tetrahedron	1	60	21	3	31	2	25	32	57	22	33	10	
+10-node-second-order-tetrahedron	1	61	6	26	46	31	30	60	47	34	54	62	
+10-node-second-order-tetrahedron	1	62	41	4	36	21	43	37	52	59	58	24	
+10-node-second-order-tetrahedron	1	63	8	41	36	46	45	52	40	49	53	51	
+10-node-second-order-tetrahedron	1	64	46	36	7	31	53	39	50	54	35	55	
+10-node-second-order-tetrahedron	1	65	41	46	5	26	51	48	44	61	29	60	
+10-node-second-order-tetrahedron	1	66	21	31	26	2	57	62	63	22	27	33	
+10-node-second-order-tetrahedron	1	67	3	31	36	21	32	55	38	25	58	57	
+10-node-second-order-tetrahedron	1	68	1	41	26	21	42	61	28	23	63	59	
