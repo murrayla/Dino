@@ -1,5 +1,8 @@
 import numpy as np
 import sympy as sym
+import multiprocessing as mp
+import scipy as sp
+from functools import partial
 from matplotlib.patches import Polygon
 from matplotlib.cm import get_cmap
 from matplotlib.colors import Normalize
@@ -925,7 +928,22 @@ def deformation_gradient(X, x):
     Cgre = Fdef.T * Fdef
     return Fdef, Cgre
 
-def ref_B_mat(X_ele, x_ele, delPhi, dim=3, n_el_n=10):
+def ref_B_mat(e, np_n, np_e, x, delPhi, dim=3, n_el_n=10):
+
+    # Preallocate natural coordinates
+    X_ele = np.zeros((n_el_n, dim))
+    x_ele = np.zeros((n_el_n, dim))
+
+    # Set rows and columns GLOBAL
+    rc = np_e[e, :]
+
+    # Find coordinates for those nodes
+    np_n_idx = np_n[:, 0]
+    for i, local_node in enumerate(rc):
+        n_idx = np.where(np_n_idx == local_node)[0]
+        X_ele[i] = np_n[n_idx, 1:dim+1][0]
+        x_ele[i] = x[n_idx, 1:dim+1][0]
+
     Bmat = np.zeros((6, 30))
 
     # Jacobian
@@ -964,18 +982,43 @@ def ref_B_mat(X_ele, x_ele, delPhi, dim=3, n_el_n=10):
 
     return Bmat, detJ
 
-def constitutive_eqs(con_type, c_vals, C):
-    # Mooney Rivlin
-    # W = c1(I1 - 3) + c2(I2-3)
-    if con_type == 0:
-        # Derivatives of Energy in terms of Invariants
-        # First Order
-        dWdI = [c_vals[0], c_vals[1], 0]
-        # Second Order
-        ddWdII = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]])
-        sPK = second_piola(dWdI, C)
-        dMo = elastic_moduli(dWdI, ddWdII, C)
-        return sPK, dMo
+def constitutive_eqs(e, con_type, c_vals, np_n, np_e, x, dim=3, n_el_n=10):
+    # Preallocate natural coordinates
+    X_ele = np.zeros((n_el_n, dim))
+    x_ele = np.zeros((n_el_n, dim))
+
+    # Set rows and columns GLOBAL
+    rc = np_e[e, :]
+
+    # Find coordinates for those nodes
+    np_n_idx = np_n[:, 0]
+    for i, local_node in enumerate(rc):
+        n_idx = np.where(np_n_idx == local_node)[0]
+        X_ele[i] = np_n[n_idx, 1:dim+1][0]
+        x_ele[i] = x[n_idx, 1:dim+1][0]
+
+    for r in range(0, n_el_n, 1):
+        _, Cgre = deformation_gradient(X_ele[r], x_ele[r])
+
+        # Mooney Rivlin
+        # W = c1(I1 - 3) + c2(I2-3)
+        if con_type == 0:
+            # Derivatives of Energy in terms of Invariants
+            # First Order
+            dWdI = [c_vals[0], c_vals[1], 0]
+            # Second Order
+            ddWdII = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]])
+            sPK = second_piola(dWdI, Cgre)
+            dMo = elastic_moduli(dWdI, ddWdII, Cgre)
+        
+        if r == 0:
+            Smat = sPK
+            Dmat = dMo
+        else:
+            Smat = np.concatenate((Smat, sPK), axis=1)
+            Dmat = np.concatenate((Dmat, dMo), axis=1)
+
+    return Smat, Dmat
 
 def second_piola(dWdI, C):
     Jc = (np.linalg.det(C))**(0.5)
@@ -1026,6 +1069,141 @@ def elastic_moduli(dWdI, ddWdII, C):
             ]
             moduli[r, c] = np.matmul(term1, term3) + np.matmul(term4, term2)
     return moduli
+
+def geometric_tangent_k(e, Spk, delPhi, np_e, k_geo, dim=3, n_el_n=10):
+    Spk = Spk[e]
+    rc = np_e[e, :]
+    ij = np.array([[0,0], [1,1], [2,2], [0,1], [1,2], [0,2]])
+    for r, n in enumerate(rc):
+        Idn = np.eye(3)
+        Geo = np.zeros((n_el_n, n_el_n))
+        Kgeo = np.zeros((3, 3))
+        for a in range(0, n_el_n, 1):
+            for b in range(0, n_el_n, 1):
+                Geo[a, b] = delPhi[ij[0,0], a] * Spk[[ij[0,0], ij[0,1]]] * delPhi[ij[0,1], b] + \
+                            delPhi[ij[1,0], a] * Spk[[ij[1,0], ij[1,1]]] * delPhi[ij[1,1], b] + \
+                            delPhi[ij[2,0], a] * Spk[[ij[2,0], ij[1,1]]] * delPhi[ij[2,1], b] + \
+                            delPhi[ij[3,0], a] * Spk[[ij[3,0], ij[3,1]]] * delPhi[ij[3,1], b] + \
+                            delPhi[ij[4,0], a] * Spk[[ij[4,0], ij[4,1]]] * delPhi[ij[4,1], b] + \
+                            delPhi[ij[5,0], a] * Spk[[ij[5,0], ij[5,1]]] * delPhi[ij[5,1], b]
+                Kgeo = Kgeo + Geo[a, b] * Idn
+        k_geo[dim*(n-1):dim*(n-1)+2, dim*(n-1):dim*(n-1)+2] = k_geo[dim*(n-1):dim*(n-1)+2, dim*(n-1):dim*(n-1)+2] + Kgeo
+    return k_geo
+    
+def gauss_int_fsol(e, weights, points, Bmat, detJ, Smat, vars, k_sol, np_e, n_el_n=10, dim=3):
+    Bmat = Bmat[e]
+    Smat = Smat[e]
+    detJ = detJ[e]
+    rc = np_e[e, :]
+    term = np.matmul(np.tranpose(Bmat), Smat)
+    term_sol = np.zeros(term.shape)
+    # Gauss Quadrature
+    for i in range(0, n_el_n*dim, 1):
+        for q, w in enumerate(weights):
+            # [1 2 3]
+            term_sol[i] = term_sol[i] + w * float((term[i]*detJ).subs({vars[0]: points[q, 0], vars[1]: points[q, 1], vars[2]: points[q, 2]}))
+
+    for r, n in enumerate(rc):
+        k_sol[dim*(n-1)+0] = term_sol[dim*r+0]
+        k_sol[dim*(n-1)+1] = term_sol[dim*r+1]
+        k_sol[dim*(n-1)+2] = term_sol[dim*r+2]
+
+    return k_sol
+
+def gauss_int_ftan(e, weights, points, Bmat, detJ, Dmat, Gmat, vars, k_tan, np_e, n_el_n=10, dim=3):
+    Bmat = Bmat[e]
+    Dmat = Dmat[e]
+    Gmat = Gmat[e]
+    detJ = detJ[e]
+    rc = np_e[e, :]
+    term = np.matmul(np.tranpose(Bmat), Dmat)
+    term = np.matmul(term, Bmat) + Gmat
+    term_tan = np.zeros(term.shape)
+    # Gauss Quadrature
+    for i in range(0, n_el_n*dim, 1):
+        for q, w in enumerate(weights):
+            # [1 2 3]
+            term_tan[i] = term_tan[i] + w * float((term[i]*detJ).subs({vars[0]: points[q, 0], vars[1]: points[q, 1], vars[2]: points[q, 2]}))
+
+    for r, n in enumerate(rc):
+        # [1 2 3]
+        k_tan[dim*(n-1)+0, dim*(n-1)+0] = k_tan[dim*(n-1)+0, dim*(n-1)+0] + term_tan[dim*r+0, dim*r+0] 
+        k_tan[dim*(n-1)+0, dim*(n-1)+1] = k_tan[dim*(n-1)+0, dim*(n-1)+1] + term_tan[dim*r+0, dim*r+1] 
+        k_tan[dim*(n-1)+0, dim*(n-1)+2] = k_tan[dim*(n-1)+0, dim*(n-1)+2] + term_tan[dim*r+0, dim*r+2] 
+        # [4 5 6]
+        k_tan[dim*(n-1)+1, dim*(n-1)+0] = k_tan[dim*(n-1)+1, dim*(n-1)+0] + term_tan[dim*r+1, dim*r+0] 
+        k_tan[dim*(n-1)+1, dim*(n-1)+1] = k_tan[dim*(n-1)+1, dim*(n-1)+1] + term_tan[dim*r+1, dim*r+1] 
+        k_tan[dim*(n-1)+1, dim*(n-1)+2] = k_tan[dim*(n-1)+1, dim*(n-1)+2] + term_tan[dim*r+1, dim*r+2] 
+        # [7 8 9]
+        k_tan[dim*(n-1)+2, dim*(n-1)+0] = k_tan[dim*(n-1)+2, dim*(n-1)+0] + term_tan[dim*r+2, dim*r+0] 
+        k_tan[dim*(n-1)+2, dim*(n-1)+1] = k_tan[dim*(n-1)+2, dim*(n-1)+1] + term_tan[dim*r+2, dim*r+1] 
+        k_tan[dim*(n-1)+2, dim*(n-1)+2] = k_tan[dim*(n-1)+2, dim*(n-1)+2] + term_tan[dim*r+2, dim*r+2] 
+
+    return k_tan
+
+def calc_nonlinear_func(x, np_n, np_e, w, p, delPhi, vars, con_type, c_vals, dim, n_el_n, n_ele, num_pro):
+    n_n = int(len(np_n[:, 0]))
+    k_sol = np.zeros((dim*n_n, 1))
+
+    Bmat_Pool = mp.Pool(processes=num_pro, maxtasksperchild=100)
+    Smat_Pool = mp.Pool(processes=num_pro, maxtasksperchild=100)
+    Fsol_Pool = mp.Pool(processes=num_pro, maxtasksperchild=100)
+
+    ele_list = range(0, n_ele, 1)
+
+    p_Bmat = partial(ref_B_mat, np_n=np_n, np_e=np_e, x=x, delPhi=delPhi, dim=dim, n_el_n=n_el_n)
+    p_Smat = partial(constitutive_eqs, \
+                     con_type=con_type, c_vals=c_vals, np_n=np_n, np_e=np_e, x=x, dim=dim, \
+                        n_el_n=n_el_n)
+
+    Bmat_Results = Bmat_Pool.map(p_Bmat, ele_list)
+    Bmats, detJs = zip(*Bmat_Results)
+    Smat_Results = Smat_Pool.map(p_Smat, ele_list)
+    Smats, _ = zip(*Smat_Results)
+
+    p_Fsol = partial(gauss_int_fsol, \
+                     weights=w, points=p, Bmat=Bmats, detJ=detJs, Smat=Smats, vars=vars, \
+                        k_sol=k_sol, np_e=np_e, n_el_n=n_el_n, dim=dim)
+    Fsol_Results = Fsol_Pool.map(p_Fsol, ele_list)
+
+    nrFunc = sum(Fsol_Results)
+
+    return nrFunc
+
+def calc_nonlinear_tang(x, np_n, np_e, w, p, delPhi, vars, con_type, c_vals, dim, n_el_n, n_ele, num_pro):
+    n_n = int(len(np_n[:, 0]))
+    k_tan = np.zeros((dim*n_n, dim*n_n))
+    k_geo = np.zeros((dim*n_n, dim*n_n))
+
+    Bmat_Pool = mp.Pool(processes=num_pro, maxtasksperchild=100)
+    Smat_Pool = mp.Pool(processes=num_pro, maxtasksperchild=100)
+    Gmat_Pool = mp.Pool(processes=num_pro, maxtasksperchild=100)
+    Ftan_Pool = mp.Pool(processes=num_pro, maxtasksperchild=100)
+
+    ele_list = range(0, n_ele, 1)
+
+    p_Bmat = partial(ref_B_mat, np_n=np_n, np_e=np_e, x=x, delPhi=delPhi, dim=dim, n_el_n=n_el_n)
+    p_Smat = partial(constitutive_eqs, \
+                     con_type=con_type, c_vals=c_vals, np_n=np_n, np_e=np_e, x=x, dim=dim, \
+                        n_el_n=n_el_n)
+
+    Bmat_Results = Bmat_Pool.map(p_Bmat, ele_list)
+    Bmats, detJs = zip(*Bmat_Results)
+    Smat_Results = Smat_Pool.map(p_Smat, ele_list)
+    Smats, Dmats = zip(*Smat_Results)
+
+    p_Gmat = partial(geometric_tangent_k, Spk=Smats, delPhi=delPhi, np_e=np_e, k_geo=k_geo, dim=dim, n_el_n=n_el_n)
+    Gmat_Results = Gmat_Pool.map(p_Gmat, ele_list)
+    Kgeos = zip(*Gmat_Results)
+
+    p_Fsol = partial(gauss_int_fsol, \
+                     weights=w, points=p, Bmat=Bmats, detJ=detJs, Dmat=Dmats, Gmat=Kgeos, vars=vars, \
+                        k_tan=k_tan, np_e=np_e, n_el_n=n_el_n, dim=dim)
+    Ftan_Results = Ftan_Pool.map(p_Fsol, ele_list)
+
+    nrTang = sum(Ftan_Results)
+
+    return nrTang
 
 # u         = np.loadtxt("output_files/u_" + FILE_NAME + ".text", dtype=float)
 # k_gl      = np.loadtxt("output_files/k_" + FILE_NAME + ".text", dtype=float)
