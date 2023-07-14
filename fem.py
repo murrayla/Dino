@@ -15,7 +15,7 @@ from functools import partial
 import dino
 
 # Global Variables
-FILE_NAME = "3Dtwotet"
+FILE_NAME = "GitHub/Dino/gmsh_cubeTest.msh"
 ELEMENT_TYPE = 1
 ELEMENT_ORDER = 1
 CONSTITUTIVE_TYPE = 0
@@ -35,7 +35,7 @@ def main():
     we, gp = dino.gauss_num_int(el_type=ELEMENT_TYPE, order=GAUSS_ORDER)
 
     # Intake Mesh
-    dino.nodes_and_elements(file_name="msh_files/" + FILE_NAME + ".msh", type_num=11)
+    dino.nodes_and_elements(FILE_NAME, type_num=11)
     nodes = open("GitHub/Dino/cubeTest_cvt2dino.nodes", 'r')
     elems = open("GitHub/Dino/cubeTest_cvt2dino.ele", 'r')
     n_list = list()
@@ -63,15 +63,18 @@ def main():
     ## BEGIN NEWTON RAPHSON ##
     ## -- 
 
-    x_guess = np_n
+    x_guess = np_n[:, 1:]
+    x_guess = x_guess.flatten()
 
-    root, r = sp.optimize.newton(dino.calc_nonlinear_func, x_guess, dino.calc_nonlinear_tang, \
-                                 args=(np_n, np_e, we, gp, delPhi, vars, CONSTITUTIVE_TYPE, C_VALS, dim, n_el_n, n_ele, NUM_PROCESSES), \
-                                    tol=1.48e-08, maxiter=50, full_output=False, disp=True)
+    p_nonLin_func = partial(dino.calc_nonlinear_func, np_n=np_n, np_e=np_e, w=we, p=gp, delPhi=delPhi, \
+                     sym_vars=sym_vars, con_type=CONSTITUTIVE_TYPE, c_vals=C_VALS, dim=dim, n_el_n=n_el_n, n_ele=n_ele, num_pro=NUM_PROCESSES)
+    p_nonLin_tang = partial(dino.calc_nonlinear_tang, np_n=np_n, np_e=np_e, w=we, p=gp, delPhi=delPhi, \
+                     sym_vars=sym_vars, con_type=CONSTITUTIVE_TYPE, c_vals=C_VALS, dim=dim, n_el_n=n_el_n, n_ele=n_ele, num_pro=NUM_PROCESSES)
+    root = sp.optimize.newton(p_nonLin_func, x_guess, p_nonLin_tang, tol=1.48e-08, maxiter=50, full_output=False, disp=True)
 
     ## END NEWTON RAPHSON ##
 
-    print(root, r)
+    print(root)
 
     # # Matrix Setup
     # k_gl = sum(p_k_gl)

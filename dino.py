@@ -920,15 +920,14 @@ def nodes_and_elements(file_name, type_num):
                 continue
 
 def deformation_gradient(X, x):
-    Fdef = np.array([
-        [(x[0] - X[0])/X[0], (x[1] - X[1])/X[0], (x[2] - X[2])/X[0]],
-        [(x[0] - X[0])/X[1], (x[1] - X[1])/X[1], (x[2] - X[2])/X[1]],
-        [(x[0] - X[0])/X[2], (x[2] - X[2])/X[2], (x[2] - X[2])/X[2]]
-    ])
+    J = np.gradient(x) / (np.gradient(X) + 1e-10)
+    Fdef = J + np.eye(3)
     Cgre = Fdef.T * Fdef
     return Fdef, Cgre
 
 def ref_B_mat(e, np_n, np_e, x, delPhi, dim=3, n_el_n=10):
+    n_n = int(len(np_n[:, 0]))
+    xc = x.reshape(n_n, 3)
 
     # Preallocate natural coordinates
     X_ele = np.zeros((n_el_n, dim))
@@ -942,7 +941,7 @@ def ref_B_mat(e, np_n, np_e, x, delPhi, dim=3, n_el_n=10):
     for i, local_node in enumerate(rc):
         n_idx = np.where(np_n_idx == local_node)[0]
         X_ele[i] = np_n[n_idx, 1:dim+1][0]
-        x_ele[i] = x[n_idx, 1:dim+1][0]
+        x_ele[i] = xc[n_idx, :][0]
 
     Bmat = np.zeros((6, 30))
 
@@ -983,9 +982,14 @@ def ref_B_mat(e, np_n, np_e, x, delPhi, dim=3, n_el_n=10):
     return Bmat, detJ
 
 def constitutive_eqs(e, con_type, c_vals, np_n, np_e, x, dim=3, n_el_n=10):
+    n_n = int(len(np_n[:, 0]))
+    xc = x.reshape(n_n, 3)
+
     # Preallocate natural coordinates
     X_ele = np.zeros((n_el_n, dim))
     x_ele = np.zeros((n_el_n, dim))
+    Smat = np.zeros((6, n_el_n))
+    Dmat = np.zeros((6, n_el_n*6))
 
     # Set rows and columns GLOBAL
     rc = np_e[e, :]
@@ -995,7 +999,7 @@ def constitutive_eqs(e, con_type, c_vals, np_n, np_e, x, dim=3, n_el_n=10):
     for i, local_node in enumerate(rc):
         n_idx = np.where(np_n_idx == local_node)[0]
         X_ele[i] = np_n[n_idx, 1:dim+1][0]
-        x_ele[i] = x[n_idx, 1:dim+1][0]
+        x_ele[i] = xc[n_idx, :][0]
 
     for r in range(0, n_el_n, 1):
         _, Cgre = deformation_gradient(X_ele[r], x_ele[r])
@@ -1011,12 +1015,8 @@ def constitutive_eqs(e, con_type, c_vals, np_n, np_e, x, dim=3, n_el_n=10):
             sPK = second_piola(dWdI, Cgre)
             dMo = elastic_moduli(dWdI, ddWdII, Cgre)
         
-        if r == 0:
-            Smat = sPK
-            Dmat = dMo
-        else:
-            Smat = np.concatenate((Smat, sPK), axis=1)
-            Dmat = np.concatenate((Dmat, dMo), axis=1)
+        Smat[:, r] = sPK
+        Dmat[:, 6*r:(6*r+6)] = dMo
 
     return Smat, Dmat
 
@@ -1034,7 +1034,7 @@ def second_piola(dWdI, C):
                     0.5 * Jc * invC[ij[i,0], ij[i,1]]]
         sPk_i = np.matmul(delIdelC, np.array(dWdI))
         sPK[i] = 2 * sPk_i
-    return sPK
+    return np.transpose(sPK)
 
 def elastic_moduli(dWdI, ddWdII, C):
     Jc = (np.linalg.det(C))**(0.5)
@@ -1090,27 +1090,28 @@ def geometric_tangent_k(e, Spk, delPhi, np_e, k_geo, dim=3, n_el_n=10):
         k_geo[dim*(n-1):dim*(n-1)+2, dim*(n-1):dim*(n-1)+2] = k_geo[dim*(n-1):dim*(n-1)+2, dim*(n-1):dim*(n-1)+2] + Kgeo
     return k_geo
     
-def gauss_int_fsol(e, weights, points, Bmat, detJ, Smat, vars, k_sol, np_e, n_el_n=10, dim=3):
+def gauss_int_fsol(e, weights, points, Bmat, detJ, Smat, sym_vars, k_sol, np_e, n_el_n=10, dim=3):
     Bmat = Bmat[e]
     Smat = Smat[e]
     detJ = detJ[e]
     rc = np_e[e, :]
-    term = np.matmul(np.tranpose(Bmat), Smat)
+    term = sym.Matrix(np.matmul(np.transpose(Bmat), Smat))
     term_sol = np.zeros(term.shape)
     # Gauss Quadrature
-    for i in range(0, n_el_n*dim, 1):
-        for q, w in enumerate(weights):
-            # [1 2 3]
-            term_sol[i] = term_sol[i] + w * float((term[i]*detJ).subs({vars[0]: points[q, 0], vars[1]: points[q, 1], vars[2]: points[q, 2]}))
+    for i in range(0, dim*n_el_n, 1):
+        for j in range(0, n_el_n, 1):
+            for q, w in enumerate(weights):
+                # [1 2 3]
+                term_sol[i, j] = term_sol[i, j] + w * float((term[i, j]*detJ).subs({sym_vars[0]: points[q, 0], sym_vars[1]: points[q, 1], sym_vars[2]: points[q, 2]}))
 
     for r, n in enumerate(rc):
-        k_sol[dim*(n-1)+0] = term_sol[dim*r+0]
-        k_sol[dim*(n-1)+1] = term_sol[dim*r+1]
-        k_sol[dim*(n-1)+2] = term_sol[dim*r+2]
+        k_sol[dim*(n-1)+0] = sum(term_sol[dim*r+0, :])
+        k_sol[dim*(n-1)+1] = sum(term_sol[dim*r+1, :])
+        k_sol[dim*(n-1)+2] = sum(term_sol[dim*r+2, :])
 
     return k_sol
 
-def gauss_int_ftan(e, weights, points, Bmat, detJ, Dmat, Gmat, vars, k_tan, np_e, n_el_n=10, dim=3):
+def gauss_int_ftan(e, weights, points, Bmat, detJ, Dmat, Gmat, sym_vars, k_tan, np_e, n_el_n=10, dim=3):
     Bmat = Bmat[e]
     Dmat = Dmat[e]
     Gmat = Gmat[e]
@@ -1123,7 +1124,7 @@ def gauss_int_ftan(e, weights, points, Bmat, detJ, Dmat, Gmat, vars, k_tan, np_e
     for i in range(0, n_el_n*dim, 1):
         for q, w in enumerate(weights):
             # [1 2 3]
-            term_tan[i] = term_tan[i] + w * float((term[i]*detJ).subs({vars[0]: points[q, 0], vars[1]: points[q, 1], vars[2]: points[q, 2]}))
+            term_tan[i] = term_tan[i] + w * float((term[i]*detJ).subs({sym_vars[0]: points[q, 0], sym_vars[1]: points[q, 1], sym_vars[2]: points[q, 2]}))
 
     for r, n in enumerate(rc):
         # [1 2 3]
@@ -1141,9 +1142,9 @@ def gauss_int_ftan(e, weights, points, Bmat, detJ, Dmat, Gmat, vars, k_tan, np_e
 
     return k_tan
 
-def calc_nonlinear_func(x, np_n, np_e, w, p, delPhi, vars, con_type, c_vals, dim, n_el_n, n_ele, num_pro):
+def calc_nonlinear_func(x, np_n, np_e, w, p, delPhi, sym_vars, con_type, c_vals, dim, n_el_n, n_ele, num_pro):
     n_n = int(len(np_n[:, 0]))
-    k_sol = np.zeros((dim*n_n, 1))
+    k_sol = np.zeros(dim*n_n)
 
     Bmat_Pool = mp.Pool(processes=num_pro, maxtasksperchild=100)
     Smat_Pool = mp.Pool(processes=num_pro, maxtasksperchild=100)
@@ -1162,7 +1163,7 @@ def calc_nonlinear_func(x, np_n, np_e, w, p, delPhi, vars, con_type, c_vals, dim
     Smats, _ = zip(*Smat_Results)
 
     p_Fsol = partial(gauss_int_fsol, \
-                     weights=w, points=p, Bmat=Bmats, detJ=detJs, Smat=Smats, vars=vars, \
+                     weights=w, points=p, Bmat=Bmats, detJ=detJs, Smat=Smats, sym_vars=sym_vars, \
                         k_sol=k_sol, np_e=np_e, n_el_n=n_el_n, dim=dim)
     Fsol_Results = Fsol_Pool.map(p_Fsol, ele_list)
 
@@ -1170,7 +1171,7 @@ def calc_nonlinear_func(x, np_n, np_e, w, p, delPhi, vars, con_type, c_vals, dim
 
     return nrFunc
 
-def calc_nonlinear_tang(x, np_n, np_e, w, p, delPhi, vars, con_type, c_vals, dim, n_el_n, n_ele, num_pro):
+def calc_nonlinear_tang(x, np_n, np_e, w, p, delPhi, sym_vars, con_type, c_vals, dim, n_el_n, n_ele, num_pro):
     n_n = int(len(np_n[:, 0]))
     k_tan = np.zeros((dim*n_n, dim*n_n))
     k_geo = np.zeros((dim*n_n, dim*n_n))
@@ -1197,11 +1198,15 @@ def calc_nonlinear_tang(x, np_n, np_e, w, p, delPhi, vars, con_type, c_vals, dim
     Kgeos = zip(*Gmat_Results)
 
     p_Fsol = partial(gauss_int_fsol, \
-                     weights=w, points=p, Bmat=Bmats, detJ=detJs, Dmat=Dmats, Gmat=Kgeos, vars=vars, \
+                     weights=w, points=p, Bmat=Bmats, detJ=detJs, Dmat=Dmats, Gmat=Kgeos, sym_vars=sym_vars, \
                         k_tan=k_tan, np_e=np_e, n_el_n=n_el_n, dim=dim)
     Ftan_Results = Ftan_Pool.map(p_Fsol, ele_list)
 
-    nrTang = sum(Ftan_Results)
+    nrFtan = sum(Ftan_Results)
+
+    Xref = np_n[:, 1:].flatten()
+
+    nrTang = np.matmul(nrFtan, (x-Xref))
 
     return nrTang
 
