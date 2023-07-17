@@ -24,6 +24,8 @@ GAUSS_ORDER = 5
 E_MOD = 200 
 NU = 0.20
 NUM_PROCESSES = 4
+ITERATIONS = 100
+TOLERANCE = 1.48e-08
 
 def main():
     ## SETUP START ##
@@ -55,25 +57,23 @@ def main():
     n_ele = len(np_e[:, 0])
     n_n = int(len(np_n[:, 0]))
 
-    # Definite constitutive relationship
-    d, mu, lam = dino.get_D_mat(E_MOD, NU)
     # --
     ## SETUP END ##
     
     ## BEGIN NEWTON RAPHSON ##
     ## -- 
 
-    x_guess = np_n[:, 1:]
-    x_guess = x_guess.flatten()
+    u = np.zeros(n_n*dim)
+    u, nodes = dino.apply_nonlinear_BC(np_n, u, BC_0=0, BC_1=2, axi=0, dim=3)
 
-    p_nonLin_func = partial(dino.calc_nonlinear_func, np_n=np_n, np_e=np_e, w=we, p=gp, delPhi=delPhi, \
-                     sym_vars=sym_vars, con_type=CONSTITUTIVE_TYPE, c_vals=C_VALS, dim=dim, n_el_n=n_el_n, n_ele=n_ele, num_pro=NUM_PROCESSES)
-    p_nonLin_tang = partial(dino.calc_nonlinear_tang, np_n=np_n, np_e=np_e, w=we, p=gp, delPhi=delPhi, \
-                     sym_vars=sym_vars, con_type=CONSTITUTIVE_TYPE, c_vals=C_VALS, dim=dim, n_el_n=n_el_n, n_ele=n_ele, num_pro=NUM_PROCESSES)
-    root = sp.optimize.newton(p_nonLin_func, x_guess, p_nonLin_tang, tol=1.48e-08, maxiter=50, full_output=False, disp=True)
-
+    root, it = dino.newton_raph(u, ITERATIONS, TOLERANCE, nodes, np_n, np_e, \
+                                we, gp, delPhi, sym_vars, CONSTITUTIVE_TYPE, C_VALS, \
+                                dim, n_el_n, n_ele, NUM_PROCESSES)
+    
+    ## --
     ## END NEWTON RAPHSON ##
 
+    print("After {} iterations we have:".format(it))
     print(root)
 
     # # Matrix Setup
