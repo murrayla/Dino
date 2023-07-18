@@ -21,7 +21,7 @@ GAUSS_ORDER = 5
 E_MOD = 200 
 NU = 0.20
 NUM_PROCESSES = 4
-ITERATIONS = 100
+ITERATIONS = 2
 TOLERANCE = 1.48e-08
 
 def main():
@@ -57,7 +57,7 @@ def main():
 
     dim = 3
     u = np.zeros(n_n*dim)
-    u, nodes = dino.apply_nonlinear_BC(np_n, u, BC_0=0, BC_1=1, axi=0)
+    u, nodes = dino.apply_nonlinear_BC(np_n, u, BC_0=0, BC_1=5, axi=0)
     # nodes = None
     
     root, it = dino.newton_raph(u, nodes, np_n, np_e, n_ele, \
@@ -67,8 +67,10 @@ def main():
     ## --
     ## END NEWTON RAPHSON ##
 
-    print("After {} iterations we have:".format(it))
-    print(root)
+    # print("After {} iterations we have:".format(it))
+    # print(root)
+
+    dino.plot_geo(np_n, np_e, root)
 
 if __name__ == '__main__':
     mp.freeze_support()

@@ -1,6 +1,7 @@
 import numpy as np
 import sympy as sym
 import multiprocessing as mp
+import matplotlib.pyplot as plt
 from functools import partial
 
 def apply_nonlinear_BC(np_n, u, BC_0, BC_1, axi, dim=3):
@@ -275,37 +276,26 @@ def ref_B_mat(e, np_n, np_e, x, el_type, el_order, order):
     Fdef, _ = deformation_gradient(X_ele, x_ele, el_type, el_order, order)
 
     # Jacobian
-    jac = delPhi * X_ele
+    jac = delPhi * x_ele
     detJ = jac.det()
-    b_sub = jac.inv() * delPhi
+    num_cols = dim * n_el_n
 
-    # B Matrix
-    b_mat = sym.zeros(6,dim*n_el_n)
-    for r, c in enumerate(range(0, dim*n_el_n, dim)):
-        # [F11φα,1 F21φα,1 F31φα,1] 
-        b_mat[0, c] = Fdef[0,0] * b_sub[0, r]
-        b_mat[0, c+1] = Fdef[1,0] * b_sub[0, r]
-        b_mat[0, c+2] = Fdef[2,0] * b_sub[0, r]
-        # [F12φα,2 F22φα,2 F32φα,2]
-        b_mat[1, c] = Fdef[0,1] * b_sub[1, r]
-        b_mat[1, c+1] = Fdef[1,1] * b_sub[1, r]
-        b_mat[1, c+2] = Fdef[2,1] * b_sub[1, r]
-        # [F13φα,3 F23φα,3 F33φα,3]
-        b_mat[2, c] = Fdef[0,2] * b_sub[2, r]
-        b_mat[2, c+1] = Fdef[1,2] * b_sub[2, r]
-        b_mat[2, c+2] = Fdef[2,2] * b_sub[2, r]
-        # [F11φα,2 + F12φα,1 F21φα,2 + F22φα,1 F31φα,2 + F32φα,1]
-        b_mat[3, c] = Fdef[0,0] * b_sub[1, r] + Fdef[0,1] * b_sub[0, r]
-        b_mat[3, c+1] = Fdef[1,0] * b_sub[1, r] + Fdef[1,1] * b_sub[0, r]
-        b_mat[3, c+2] = Fdef[2,0] * b_sub[1, r] + Fdef[2,1] * b_sub[0, r]
-        # [F12φα,3 + F13φα,2 F22φα,3 + F23φα,2 F32φα,3 + F33φα,2]
-        b_mat[4, c] = Fdef[0,1] * b_sub[2, r] + Fdef[0,2] * b_sub[1, r]
-        b_mat[4, c+1] = Fdef[1,1] * b_sub[2, r] + Fdef[1,2] * b_sub[1, r]
-        b_mat[4, c+2] = Fdef[2,1] * b_sub[2, r] + Fdef[2,2] * b_sub[1, r]
-        # [F13φα,1 + F11φα,3 F23φα,1 + F21φα,3 F33φα,1 + F31φα,3]  
-        b_mat[5, c] = Fdef[0,2] * b_sub[0, r] + Fdef[0,0] * b_sub[2, r]
-        b_mat[5, c+1] = Fdef[1,2] * b_sub[0, r] + Fdef[1,0] * b_sub[2, r]
-        b_mat[5, c+2] = Fdef[2,2] * b_sub[0, r] + Fdef[2,0] * b_sub[2, r]
+    # Initialize a matrix filled with zeros
+    b_mat = sym.zeros(6, num_cols)
+
+    # Loop through each column index c
+    for r, c in enumerate(range(0, num_cols, dim)):
+        # Calculate and fill the values for each row in b_mat
+        for i in range(dim):
+            # [Fij * φα,j]
+            for j in range(dim):
+                b_mat[i, c + j] = Fdef[i, j] * delPhi[i, r]
+
+            # [Fij * φα,k + Fik * φα,j] for k != j
+            for k in range(dim):
+                if k == j:
+                    continue
+                b_mat[i + j + 1, c + k] = Fdef[i, j] * delPhi[k, r] + Fdef[i, k] * delPhi[j, r]
 
     return b_mat, detJ
 
@@ -356,7 +346,7 @@ def second_piola(dWdI, C, Jc):
     sPK = np.zeros(6)
     diracD = np.eye(3)
     # Stress Indexes
-    ij = np.array([[0,0], [1,1], [2,2], [0,1], [1,2], [0,2]])
+    ij = np.array([[0,0], [1,1], [2,2], [0,1], [1,2], [2,0]])
     invC = np.linalg.inv(C)
     # Fill 2ndPK
     for i in range(0, 6, 1): 
@@ -372,7 +362,7 @@ def elastic_moduli(dWdI, ddWdII, C, Jc):
     invC = np.linalg.inv(C)
     moduli = np.zeros((6,6))
     # Stress Indexes
-    ij = np.array([[0,0], [1,1], [2,2], [0,1], [1,2], [0,2]])
+    ij = np.array([[0,0], [1,1], [2,2], [0,1], [1,2], [2,0]])
     for r in range(0, 6, 1):
         term1 = 4 * np.matmul(
             [dd[ij[r,0], ij[r,1]],
@@ -566,9 +556,63 @@ def newton_raph(u, nodes, np_n, np_e, n_ele, el_type, el_order, order, con_type,
         diff = np.average(da - u)
         print("Residual Average: {}".format(np.average(nrFunc)))
         print("Iteration Number: {}".format(i))
+        ur = np.round(u, 2)
+        print(ur)
         if abs(diff) < tol:
             return da, i
         u = da
     
     print("Did not converge")
     return u, iters
+
+def plot_geo(np_n, np_e, u):
+    n_n    = int(len(np_n[:, 0]))
+
+    # Node position matrices
+    refX = np_n[:, 1:]
+    curx = (refX.flatten() + u).reshape(n_n, 3)
+
+    # Set figures
+    fig0 = plt.figure()
+
+    ax0 = fig0.add_subplot(121, projection='3d')
+    ax1 = fig0.add_subplot(122, projection='3d')
+
+    egs = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 0),
+             (0, 6), (6, 7), (7, 9), (9, 2),
+             (7, 8), (8, 4)]
+    
+    # Plot patches
+    for _, el_ns in enumerate(np_e):
+        vtsx = []
+        vtsX = []
+        cNode = [el_ns[0]-1, el_ns[4]-1, el_ns[1]-1,
+                        el_ns[5]-1, el_ns[2]-1, el_ns[6]-1,
+                        el_ns[7]-1, el_ns[3]-1, el_ns[8]-1, 
+                        el_ns[9]-1]
+        vtsx = np.array([(xp, yp, zp) for xp, yp, zp in curx[cNode, :]])
+        vtsX = np.array([(Xp, Yp, Zp) for Xp, Yp, Zp in refX[cNode, :]])
+        for edge in egs:
+            x = [vtsx[edge[0]][0], vtsx[edge[1]][0]]
+            y = [vtsx[edge[0]][1], vtsx[edge[1]][1]]
+            z = [vtsx[edge[0]][2], vtsx[edge[1]][2]]
+            X = [vtsX[edge[0]][0], vtsX[edge[1]][0]]
+            Y = [vtsX[edge[0]][1], vtsX[edge[1]][1]]
+            Z = [vtsX[edge[0]][2], vtsX[edge[1]][2]]
+            ax0.plot(X, Y, Z, c='k', alpha=1)
+            ax1.plot(x, y, z, c='k', alpha=1)
+
+    # Axis 
+    ax0.set_xlabel('X')
+    ax0.set_ylabel('Y')
+    ax0.set_zlabel('Z')
+    ax0.set_title('Reference Configuration')
+    ax0.tick_params(labelsize=5)
+
+    ax1.set_xlabel('X')
+    ax1.set_ylabel('Y')
+    ax1.set_zlabel('Z')
+    ax1.set_title('Current Configuration')
+    ax1.tick_params(labelsize=5)
+
+    plt.show()
