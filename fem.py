@@ -12,7 +12,8 @@ import multiprocessing as mp
 import dino
 
 # Global Variables
-FILE_NAME = "GitHub/Dino/gmsh_cubeTest.msh"
+DIRECTORY = "GitHub/Dino/"
+FILE_NAME = "cubeTest"
 ELEMENT_TYPE = 1
 ELEMENT_ORDER = 1
 CONSTITUTIVE_TYPE = 0
@@ -20,8 +21,8 @@ C_VALS = [4, 2]
 GAUSS_ORDER = 5
 E_MOD = 200 
 NU = 0.20
-NUM_PROCESSES = 4
-ITERATIONS = 2
+NUM_PROCESSES = 5
+ITERATIONS = 5
 TOLERANCE = 1.48e-08
 
 def main():
@@ -30,9 +31,9 @@ def main():
     # --
 
     # Intake Mesh
-    dino.nodes_and_elements(FILE_NAME, type_num=11)
-    nodes = open("GitHub/Dino/cubeTest_cvt2dino.nodes", 'r')
-    elems = open("GitHub/Dino/cubeTest_cvt2dino.ele", 'r')
+    dino.nodes_and_elements(DIRECTORY + "gmsh_" + FILE_NAME + ".msh", type_num=11)
+    nodes = open(DIRECTORY + FILE_NAME + "_cvt2dino.nodes", 'r')
+    elems = open(DIRECTORY + FILE_NAME + "_cvt2dino.ele", 'r')
     n_list = list()
     e_list = list()
 
@@ -57,8 +58,10 @@ def main():
 
     dim = 3
     u = np.zeros(n_n*dim)
-    u, nodes = dino.apply_nonlinear_BC(np_n, u, BC_0=0, BC_1=5, axi=0)
-    # nodes = None
+    nodes = list()
+    u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC_0=0, BC_1=10, axi=0)
+    # u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC_0=0, BC_1=0, axi=1)
+    # u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC_0=0, BC_1=None, axi=2)
     
     root, it = dino.newton_raph(u, nodes, np_n, np_e, n_ele, \
                  ELEMENT_TYPE, ELEMENT_ORDER, GAUSS_ORDER, \
@@ -67,8 +70,8 @@ def main():
     ## --
     ## END NEWTON RAPHSON ##
 
-    # print("After {} iterations we have:".format(it))
-    # print(root)
+    print("After {} iterations we have:".format(it))
+    print(root)
 
     dino.plot_geo(np_n, np_e, root)
 
