@@ -13,7 +13,7 @@ import dino
 
 # Global Variables
 DIRECTORY = "GitHub/Dino/"
-FILE_NAME = "cubeTest"
+FILE_NAME = "oneTetTest"
 ELEMENT_TYPE = 1
 ELEMENT_ORDER = 1
 CONSTITUTIVE_TYPE = 0
@@ -21,9 +21,9 @@ C_VALS = [4, 2]
 GAUSS_ORDER = 5
 E_MOD = 200 
 NU = 0.20
-NUM_PROCESSES = 5
-ITERATIONS = 5
-TOLERANCE = 1.48e-08
+NUM_PROCESSES = 4
+ITERATIONS = 10
+TOLERANCE = 1.48e-15
 
 def main():
 
@@ -59,7 +59,7 @@ def main():
     dim = 3
     u = np.zeros(n_n*dim)
     nodes = list()
-    u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC_0=0, BC_1=10, axi=0)
+    u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC_0=0, BC_1=3, axi=0)
     # u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC_0=0, BC_1=0, axi=1)
     # u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC_0=0, BC_1=None, axi=2)
     
