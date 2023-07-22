@@ -13,7 +13,7 @@ import dino
 
 # Global Variables
 DIRECTORY = "GitHub/Dino/"
-FILE_NAME = "oneTetTest"
+FILE_NAME = "cubeTest"
 ELEMENT_TYPE = 1
 ELEMENT_ORDER = 1
 CONSTITUTIVE_TYPE = 0
@@ -23,7 +23,7 @@ E_MOD = 200
 NU = 0.20
 NUM_PROCESSES = 4
 ITERATIONS = 10
-TOLERANCE = 1.48e-15
+TOLERANCE = 1.48e-8
 
 def main():
 
@@ -59,7 +59,7 @@ def main():
     dim = 3
     u = np.zeros(n_n*dim)
     nodes = list()
-    u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC_0=0, BC_1=3, axi=0)
+    u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC_0=0, BC_1=5, axi=0)
     # u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC_0=0, BC_1=0, axi=1)
     # u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC_0=0, BC_1=None, axi=2)
     
@@ -73,7 +73,8 @@ def main():
     print("After {} iterations we have:".format(it))
     print(root)
 
-    dino.plot_geo(np_n, np_e, root)
+    # dino.plot_geo(np_n, np_e, root)
+    dino.plot_disps(np_n, np_e, root, n_ele, ELEMENT_TYPE, ELEMENT_ORDER, GAUSS_ORDER)
 
 if __name__ == '__main__':
     mp.freeze_support()
