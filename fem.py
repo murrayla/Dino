@@ -13,17 +13,17 @@ import dino
 
 # Global Variables
 DIRECTORY = "GitHub/Dino/"
-FILE_NAME = "cubeTest"
+FILE_NAME = "oneTetTest"
 ELEMENT_TYPE = 1
 ELEMENT_ORDER = 1
 CONSTITUTIVE_TYPE = 0
-C_VALS = [4, 2]
+C_VALS = [1, 3]
 GAUSS_ORDER = 5
 E_MOD = 200 
 NU = 0.20
 NUM_PROCESSES = 4
-ITERATIONS = 10
-TOLERANCE = 1.48e-8
+ITERATIONS = 5
+TOLERANCE = 1.48e-12
 
 def main():
 
@@ -31,7 +31,7 @@ def main():
     # --
 
     # Intake Mesh
-    dino.nodes_and_elements(DIRECTORY + "gmsh_" + FILE_NAME + ".msh", type_num=11)
+    # dino.nodes_and_elements(DIRECTORY + "gmsh_" + FILE_NAME + ".msh", type_num=11)
     nodes = open(DIRECTORY + FILE_NAME + "_cvt2dino.nodes", 'r')
     elems = open(DIRECTORY + FILE_NAME + "_cvt2dino.ele", 'r')
     n_list = list()
@@ -58,10 +58,11 @@ def main():
 
     dim = 3
     u = np.zeros(n_n*dim)
-    nodes = list()
-    u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC_0=0, BC_1=5, axi=0)
+    nodes = None
+    # nodes = list()
+    # u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC_0=0, BC_1=5, axi=0)
     # u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC_0=0, BC_1=0, axi=1)
-    # u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC_0=0, BC_1=None, axi=2)
+    # u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC_0=0, BC_1=0, axi=2)
     
     root, it = dino.newton_raph(u, nodes, np_n, np_e, n_ele, \
                  ELEMENT_TYPE, ELEMENT_ORDER, GAUSS_ORDER, \
