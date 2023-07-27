@@ -13,7 +13,7 @@ import dino
 
 # Global Variables
 DIRECTORY = "GitHub/Dino/"
-FILE_NAME = "oneTetTest"
+FILE_NAME = "cubeTest"
 CONSTITUTIVE_TYPE = 0
 C_VALS = [0.092, 0.237]
 E_MOD = 200 
@@ -57,9 +57,9 @@ def main():
     u = np.zeros(n_n*dim)
     # nodes = None
     nodes = list()
-    u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC0=[0, None, None], BC1=[5, None, None], axi=0)
-    # u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC0=[None, 0, None], BC1=[None, 0, None], axi=1)
-    # u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC0=[None, None, 0], BC1=[None, None, 0], axi=2)
+    u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC0=[0, None, None], BC1=[0, None, None], axi=0)
+    u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC0=[None, 0, None], BC1=[None, None, None], axi=1)
+    u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC0=[None, None, 0], BC1=[None, None, 0], axi=2)
     
     root, it = dino.newton_raph(u, nodes, np_n, np_e, n_ele, C_VALS, NUM_PROCESSES, ITERATIONS, TOLERANCE)
     
