@@ -14,16 +14,13 @@ import dino
 # Global Variables
 DIRECTORY = "GitHub/Dino/"
 FILE_NAME = "oneTetTest"
-ELEMENT_TYPE = 1
-ELEMENT_ORDER = 1
 CONSTITUTIVE_TYPE = 0
-C_VALS = [1, 3]
-GAUSS_ORDER = 5
+C_VALS = [0.092, 0.237]
 E_MOD = 200 
 NU = 0.20
 NUM_PROCESSES = 4
-ITERATIONS = 5
-TOLERANCE = 1.48e-12
+ITERATIONS = 4
+TOLERANCE = 1.48e-8
 
 def main():
 
@@ -58,24 +55,22 @@ def main():
 
     dim = 3
     u = np.zeros(n_n*dim)
-    nodes = None
-    # nodes = list()
-    # u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC_0=0, BC_1=5, axi=0)
-    # u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC_0=0, BC_1=0, axi=1)
-    # u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC_0=0, BC_1=0, axi=2)
+    # nodes = None
+    nodes = list()
+    u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC0=[0, None, None], BC1=[5, None, None], axi=0)
+    # u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC0=[None, 0, None], BC1=[None, 0, None], axi=1)
+    # u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC0=[None, None, 0], BC1=[None, None, 0], axi=2)
     
-    root, it = dino.newton_raph(u, nodes, np_n, np_e, n_ele, \
-                 ELEMENT_TYPE, ELEMENT_ORDER, GAUSS_ORDER, \
-                    CONSTITUTIVE_TYPE, C_VALS, NUM_PROCESSES, ITERATIONS, TOLERANCE)
+    root, it = dino.newton_raph(u, nodes, np_n, np_e, n_ele, C_VALS, NUM_PROCESSES, ITERATIONS, TOLERANCE)
     
-    ## --
+    ## -- 
     ## END NEWTON RAPHSON ##
 
     print("After {} iterations we have:".format(it))
     print(root)
 
     # dino.plot_geo(np_n, np_e, root)
-    dino.plot_disps(np_n, np_e, root, n_ele, ELEMENT_TYPE, ELEMENT_ORDER, GAUSS_ORDER)
+    dino.plot_disps(np_n, np_e, root, n_ele)
 
 if __name__ == '__main__':
     mp.freeze_support()

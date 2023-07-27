@@ -5,7 +5,10 @@ import matplotlib.pyplot as plt
 from matplotlib.cm import get_cmap
 from functools import partial
 
-def apply_nonlinear_BC(np_n, u, nodes, BC_0, BC_1, axi, dim=3):
+DIM = 3
+N_EL_N = 10
+
+def apply_nonlinear_BC(np_n, u, nodes, BC0, BC1, axi):
 
     min_val = np.amin(np_n[:, axi+1])
     max_val = np.amax(np_n[:, axi+1])
@@ -16,167 +19,79 @@ def apply_nonlinear_BC(np_n, u, nodes, BC_0, BC_1, axi, dim=3):
         n_idx = int(n)
         n_val = np_n[np_n[:, 0] == n, axi+1][0]
 
-        if n_val == min_val and BC_0 is not None:
-            u[dim*(n_idx-1)+axi] = BC_0
-            nodes.append(dim*(n_idx-1)+axi)
+        if n_val == min_val:
+            if BC0[0] is not None:
+                u[DIM*(n_idx-1)+0] = BC0[0]
+                nodes.append(DIM*(n_idx-1)+0)
+            if BC0[1] is not None:
+                u[DIM*(n_idx-1)+1] = BC0[1]
+                nodes.append(DIM*(n_idx-1)+1)
+            if BC0[2] is not None:
+                u[DIM*(n_idx-1)+2] = BC0[2]
+                nodes.append(DIM*(n_idx-1)+2)
 
-        elif n_val == max_val and BC_1 is not None:
-            u[dim*(n_idx-1)+axi] = BC_1
-            nodes.append(dim*(n_idx-1)+axi)
+        elif n_val == max_val:
+            if BC1[0] is not None:
+                u[DIM*(n_idx-1)+0] = BC1[0]
+                nodes.append(DIM*(n_idx-1)+0)
+            if BC1[1] is not None:
+                u[DIM*(n_idx-1)+1] = BC1[1]
+                nodes.append(DIM*(n_idx-1)+1)
+            if BC1[2] is not None:
+                u[DIM*(n_idx-1)+2] = BC1[2]
+                nodes.append(DIM*(n_idx-1)+2)
 
     return u, nodes
 
-def element_assign(el_type, el_order):
-    # Triangle
-    if el_type == 0:
-        # Linear
-        if el_order == 0:
-            delPhi = 0
-        # Quadratic
-        elif el_order == 1:
-            delPhi = 1
-        # Cubic
-        elif el_order == 2:
-            delPhi = 1
-        # Other
-        else: 
-            return None
-    # Tetrahedron
-    elif el_type == 1:
-        dim = 3
-        # Linear
-        if el_order == 0:
-            delPhi = 0
-        # Quadratic
-        elif el_order == 1:
-            n_el_n = 10
-            xi = sym.Symbol('xi', real=True)
-            eta = sym.Symbol('eta', real=True)
-            zeta = sym.Symbol('zeta', real=True)
-            beta = 1 - xi - eta - zeta # Dependent
-            # Individual functions
-            # # Corners
-            # n1  = xi*(2*xi-1)        
-            # n2  = eta*(2*eta-1)
-            # n3  = zeta*(2*zeta-1)
-            # n4  = beta*(2*beta-1)
-            # # Edges
-            # n5  = 4*xi*eta
-            # n6  = 4*eta*zeta
-            # n7  = 4*zeta*xi
-            # n8  = 4*xi*beta
-            # n9  = 4*zeta*beta
-            # n10 = 4*beta*eta
+def element_assign():
+    xi = sym.Symbol('xi', real=True)
+    eta = sym.Symbol('eta', real=True)
+    zeta = sym.Symbol('zeta', real=True)
+    beta = 1 - xi - eta - zeta # Dependent
 
-            # p = np.array(
-            #     [
-            #         [1, 0, 0], [0, 1, 0], [0, 0, 1],
-            #         [0, 0, 0], [0.5, 0.5, 0], [0, 0.5, 0.5],
-            #         [0.5, 0, 0.5], [0.5, 0, 0], [0, 0, 0.5],
-            #         [0, 0.5, 0]
-            #     ]
-            # )
+    # Individual functions
+    # Corners
+    n1  = xi*(2*xi-1)        
+    n2  = eta*(2*eta-1)
+    n3  = zeta*(2*zeta-1)
+    n4  = beta*(2*beta-1)
+    # Edges
+    n5  = 4*xi*eta
+    n6  = 4*eta*zeta
+    n7  = 4*zeta*xi
+    n8  = 4*xi*beta
+    n9  = 4*zeta*beta
+    n10 = 4*beta*eta
 
-            # Corners
-            n1  = beta*(2*beta-1)        
-            n2  = eta*(2*eta-1)
-            n3  = zeta*(2*zeta-1)
-            n4  = xi*(2*xi-1)
-            # Edges
-            n5  = 4*beta*eta
-            n6  = 4*eta*zeta
-            n7  = 4*zeta*beta
-            n8  = 4*xi*beta
-            n9  = 4*zeta*xi
-            n10 = 4*xi*eta
+    # Shape Functions
+    phi = sym.Matrix([n1, n2, n3, n4, n5, n6, n7, n8, n9, n10])
+    # Derivative of Shape Functions
+    # delPhi = [δφ1/δξ δφ2/δξ ... δφ10/δξ
+    #           δφ1/δξ δφ2/δξ ... δφ10/δξ
+    #           δφ1/δζ δφ2/δζ ... δφ10/δζ]
+    delPhi = sym.Matrix(
+        [
+            [sym.diff(phi[j], xi, 1)   for j in range(0, N_EL_N, 1)],  
+            [sym.diff(phi[k], eta, 1)  for k in range(0, N_EL_N, 1)],
+            [sym.diff(phi[m], zeta, 1) for m in range(0, N_EL_N, 1)]
+        ]
+    )
+    
+    return (xi, eta, zeta), phi, delPhi
 
-            p = np.array(
-                [
-                    [0, 0, 0], [0, 1, 0], [0, 0, 1],
-                    [1, 0, 0], [0, 0.5, 0], [0, 0.5, 0.5],
-                    [0, 0, 0.5], [0.5, 0, 0], [0.5, 0, 0.5],
-                    [0.5, 0.5, 0]
-                ]
-            )
+def gauss_num_int():
 
-            # n2  = xi*(2*xi-1)        
-            # n3  = eta*(2*eta-1)
-            # n4  = zeta*(2*zeta-1)
-            # n1  = beta*(2*beta-1)
-            # # Edges
-            # n6  = 4*xi*eta
-            # n10 = 4*eta*zeta
-            # n9  = 4*zeta*xi
-            # n5  = 4*xi*beta
-            # n8  = 4*zeta*beta
-            # n7  = 4*beta*eta
-
-            # Shape Functions
-            phi = sym.Matrix([n1, n2, n3, n4, n5, n6, n7, n8, n9, n10])
-            # Derivative of Shape Functions
-            # delPhi = [δφ1/δξ δφ2/δξ ... δφ10/δξ
-            #           δφ1/δξ δφ2/δξ ... δφ10/δξ
-            #           δφ1/δζ δφ2/δζ ... δφ10/δζ]
-            delPhi = sym.Matrix([[sym.diff(phi[j], xi, 1)   for j in range(0, n_el_n, 1)],  
-                        [sym.diff(phi[k], eta, 1)  for k in range(0, n_el_n, 1)],
-                        [sym.diff(phi[m], zeta, 1) for m in range(0, n_el_n, 1)]]
-                        )
-            return dim, n_el_n, (xi, eta, zeta), phi, delPhi, p
-        # Cubic
-        elif el_order == 2:
-            delPhi = 1
-        # Other
-        else: 
-            return None
-    # Rectangle
-    elif el_type == 2:
-        # Linear
-        if el_order == 0:
-            delPhi = 0
-        # Quadratic
-        elif el_order == 1:
-            delPhi = 1
-        # Cubic
-        elif el_order == 2:
-            delPhi = 1
-        # Other
-        else: 
-            return None
-    # Hexahedron
-    elif el_type == 3:
-        # Linear
-        if el_order == 0:
-            delPhi = 0
-        # Quadratic
-        elif el_order == 1:
-            delPhi = 1
-        # Cubic
-        elif el_order == 2:
-            delPhi = 1
-        # Other
-        else: 
-            return None
-    # Other
-    else:
-        return None
-
-def gauss_num_int(el_type, order):
-
-    if el_type == 0:
-        p = 0
-    elif el_type == 1:
-        if order == 5:
-            we = np.array([-4/5, 9/20, 9/20, 9/20, 9/20])
-            gp = np.array([[1/4, 1/4, 1/4], [1/2, 1/6, 1/6], 
-                        [1/6, 1/2, 1/6], [1/6, 1/6, 1/2],
-                        [1/6, 1/6, 1/6]])
-            return we, gp
-        elif order == 1:
-            return None
-        else:
-            return None
-    else:
-        return None
+    we = np.array([-4/5, 9/20, 9/20, 9/20, 9/20])
+    gp = np.array(
+        [
+            [1/4, 1/4, 1/4], 
+            [1/2, 1/6, 1/6], 
+            [1/6, 1/2, 1/6], 
+            [1/6, 1/6, 1/2],
+            [1/6, 1/6, 1/6]
+        ]
+    )
+    return we, gp
 
 def nodes_and_elements(file_name, type_num):
 
@@ -269,42 +184,29 @@ def nodes_and_elements(file_name, type_num):
             else:
                 continue
 
-def deformation_gradient(X, x, el_type, el_order):
+def deformation_gradient(X, x):
 
-    _, n_el_n, xez, _, delPhi, n_ps = element_assign(el_type, el_order)
-
-    Fdef = np.zeros((n_el_n, 3, 3))
-    detF = np.zeros(n_el_n)
+    _, _, delPhi = element_assign()
 
     # Determine δ{xyz}/δ{xietazeta} Jacobians 
-    jac_xyz = delPhi * x
+    jxyz = delPhi * x
     # Determine δ{XYZ}/δ{xietazeta} Jacboain and δ{uv}/δ{xy}
-    jac_XYZ = delPhi * X
-    inv_jac_XYZ = jac_XYZ.inv()
-    dxyzdXYZ = inv_jac_XYZ * jac_xyz
+    jXYZ = delPhi * X
+    jXEZ = jXYZ.inv()
+    dxyzdXYZ = jXEZ * jxyz
 
-    for i, p in enumerate(n_ps):
-        if np.array_equal(x, X):
-            Fdef[i, :, :] = np.eye(3)
-            detF[i] = 1
-            continue
-        Fdef[i, :, :] = np.array(dxyzdXYZ.subs({xez[0]: p[0], xez[1]: p[1], xez[2]: p[2]})).astype(float)
-        detF[i] = np.linalg.det(Fdef[i, :, :])
+    return dxyzdXYZ, dxyzdXYZ.det()
 
-    detF = np.array(detF).astype(float)
+def ref_B_mat(e, np_n, np_e, x):
 
-    return Fdef, detF
-
-def ref_B_mat(e, np_n, np_e, x, el_type, el_order):
-
-    dim, n_el_n, _, _, delPhi, _ = element_assign(el_type, el_order)
+    _, _, delPhi = element_assign()
 
     n_n = int(len(np_n[:, 0]))
     xc = x.reshape(n_n, 3)
 
     # Preallocate natural coordinates
-    X_ele = np.zeros((n_el_n, dim))
-    x_ele = np.zeros((n_el_n, dim))
+    X_ele = np.zeros((N_EL_N, DIM))
+    x_ele = np.zeros((N_EL_N, DIM))
 
     # Set rows and columns GLOBAL
     rc = np_e[e, :]
@@ -313,60 +215,57 @@ def ref_B_mat(e, np_n, np_e, x, el_type, el_order):
     np_n_idx = np_n[:, 0]
     for i, local_node in enumerate(rc):
         n_idx = np.where(np_n_idx == local_node)[0]
-        X_ele[i] = np_n[n_idx, 1:dim+1][0]
+        X_ele[i] = np_n[n_idx, 1:DIM+1][0]
         x_ele[i] = xc[n_idx, :][0]
 
-    f, _ = deformation_gradient(X_ele, x_ele, el_type, el_order)
+    f, _ = deformation_gradient(X_ele, x_ele)
 
     # Jacobian
     jac = delPhi * X_ele
     detJ = jac.det()
 
     # Initialize a matrix filled with zeros
-    b_mat = sym.zeros(6, n_el_n*dim)
+    b_mat = sym.zeros(6, N_EL_N*DIM)
 
     # Loop through each column index c
-    for r, c in enumerate(range(0, dim*n_el_n, dim)):
-        Fdef = f[r, :, :]
+    for r, c in enumerate(range(0, DIM*N_EL_N, DIM)):
         # [F11φα,1 F21φα,1 F31φα,1] 
-        b_mat[0, c+0] = Fdef[0,0] * delPhi[0, r]
-        b_mat[0, c+1] = Fdef[1,0] * delPhi[0, r]
-        b_mat[0, c+2] = Fdef[2,0] * delPhi[0, r]
+        b_mat[0, c+0] = f[0,0] * delPhi[0, r]
+        b_mat[0, c+1] = f[1,0] * delPhi[0, r]
+        b_mat[0, c+2] = f[2,0] * delPhi[0, r]
         # [F12φα,2 F22φα,2 F32φα,2]
-        b_mat[1, c+0] = Fdef[0,1] * delPhi[1, r]
-        b_mat[1, c+1] = Fdef[1,1] * delPhi[1, r]
-        b_mat[1, c+2] = Fdef[2,1] * delPhi[1, r]
+        b_mat[1, c+0] = f[0,1] * delPhi[1, r]
+        b_mat[1, c+1] = f[1,1] * delPhi[1, r]
+        b_mat[1, c+2] = f[2,1] * delPhi[1, r]
         # [F13φα,3 F23φα,3 F33φα,3]
-        b_mat[2, c+0] = Fdef[0,2] * delPhi[2, r]
-        b_mat[2, c+1] = Fdef[1,2] * delPhi[2, r]
-        b_mat[2, c+2] = Fdef[2,2] * delPhi[2, r]
+        b_mat[2, c+0] = f[0,2] * delPhi[2, r]
+        b_mat[2, c+1] = f[1,2] * delPhi[2, r]
+        b_mat[2, c+2] = f[2,2] * delPhi[2, r]
         # [F11φα,2 + F12φα,1 F21φα,2 + F22φα,1 F31φα,2 + F32φα,1]
-        b_mat[3, c+0] = Fdef[0,0] * delPhi[1, r] + Fdef[0,1] * delPhi[0, r]
-        b_mat[3, c+1] = Fdef[1,0] * delPhi[1, r] + Fdef[1,1] * delPhi[0, r]
-        b_mat[3, c+2] = Fdef[2,0] * delPhi[1, r] + Fdef[2,1] * delPhi[0, r]
+        b_mat[3, c+0] = f[0,0] * delPhi[1, r] + f[0,1] * delPhi[0, r]
+        b_mat[3, c+1] = f[1,0] * delPhi[1, r] + f[1,1] * delPhi[0, r]
+        b_mat[3, c+2] = f[2,0] * delPhi[1, r] + f[2,1] * delPhi[0, r]
         # [F12φα,3 + F13φα,2 F22φα,3 + F23φα,2 F32φα,3 + F33φα,2]
-        b_mat[4, c+0] = Fdef[0,1] * delPhi[2, r] + Fdef[0,2] * delPhi[1, r]
-        b_mat[4, c+1] = Fdef[1,1] * delPhi[2, r] + Fdef[1,2] * delPhi[1, r]
-        b_mat[4, c+2] = Fdef[2,1] * delPhi[2, r] + Fdef[2,2] * delPhi[1, r]
+        b_mat[4, c+0] = f[0,1] * delPhi[2, r] + f[0,2] * delPhi[1, r]
+        b_mat[4, c+1] = f[1,1] * delPhi[2, r] + f[1,2] * delPhi[1, r]
+        b_mat[4, c+2] = f[2,1] * delPhi[2, r] + f[2,2] * delPhi[1, r]
         # [F13φα,1 + F11φα,3 F23φα,1 + F21φα,3 F33φα,1 + F31φα,3]  
-        b_mat[5, c+0] = Fdef[0,2] * delPhi[0, r] + Fdef[0,0] * delPhi[2, r]
-        b_mat[5, c+1] = Fdef[1,2] * delPhi[0, r] + Fdef[1,0] * delPhi[2, r]
-        b_mat[5, c+2] = Fdef[2,2] * delPhi[0, r] + Fdef[2,0] * delPhi[2, r]
+        b_mat[5, c+0] = f[0,2] * delPhi[0, r] + f[0,0] * delPhi[2, r]
+        b_mat[5, c+1] = f[1,2] * delPhi[0, r] + f[1,0] * delPhi[2, r]
+        b_mat[5, c+2] = f[2,2] * delPhi[0, r] + f[2,0] * delPhi[2, r]
 
     return b_mat, detJ
 
-def constitutive_eqs(e, con_type, c_vals, np_n, np_e, x, el_type, el_order, order):
+def constitutive_eqs(e, c_vals, np_n, np_e, x):
 
-    dim, n_el_n, _, _, _, _ = element_assign(el_type, el_order)
+    _, _, _ = element_assign()
 
     n_n = int(len(np_n[:, 0]))
     xc = x.reshape(n_n, 3)
 
     # Preallocate natural coordinates
-    X_ele = np.zeros((n_el_n, dim))
-    x_ele = np.zeros((n_el_n, dim))
-    Smat = np.zeros((6, n_el_n))
-    Dmat = np.zeros((n_el_n, 6, 6))
+    X_ele = np.zeros((N_EL_N, DIM))
+    x_ele = np.zeros((N_EL_N, DIM))
 
     # Set rows and columns GLOBAL
     rc = np_e[e, :]
@@ -375,220 +274,210 @@ def constitutive_eqs(e, con_type, c_vals, np_n, np_e, x, el_type, el_order, orde
     np_n_idx = np_n[:, 0]
     for i, local_node in enumerate(rc):
         n_idx = np.where(np_n_idx == local_node)[0]
-        X_ele[i] = np_n[n_idx, 1:dim+1][0]
+        X_ele[i] = np_n[n_idx, 1:DIM+1][0]
         x_ele[i] = xc[n_idx, :][0]
 
-    F, J = deformation_gradient(X_ele, x_ele, el_type, el_order)
+    f, jac = deformation_gradient(X_ele, x_ele)
 
-    for n in range(0, n_el_n, 1):
-        Fdef = F[n, :, :]
-        detF = J[n]
-        Cgre = Fdef.T * Fdef
-        # Mooney Rivlin
-        # W = c1(I1 - 3) + c2(I2-3)
-        if con_type == 0:
-            # Derivatives of Energy in terms of Invariants
-            # First Order
-            dWdI = [c_vals[0], c_vals[1], 0]
-            # Second Order
-            ddWdII = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]])
-            Smat[:, n] = second_piola(dWdI, Cgre, detF)
-            Dmat[n, :, :] = elastic_moduli(dWdI, ddWdII, Cgre, detF)
+    Cgre = f.T * f
+    invC = Cgre.inv()
+    trC = Cgre[0,0] + Cgre[1,1] + Cgre[2,2]
+    # Mooney Rivlin
+    # W = c1(I1 - 3) + c2(I2-3) + d*(J-1)^2
+    d = 1000.10
+    # Derivatives of Energy in terms of Invariants
+    # First Order
+    dWdI = sym.Matrix([c_vals[0], c_vals[1], 2*d*(jac-1)])
+    # Second Order
+    ddWdII = sym.Matrix([[0, 0, 0], [0, 0, 0], [0, 0, 2*d]])
+    Smat = second_piola(dWdI, Cgre, invC, trC, jac)
+    Dmat = elastic_moduli(dWdI, ddWdII, Cgre, invC, trC, jac)
     
     return Smat, Dmat
 
-def second_piola(dWdI, C, Jc):
+def second_piola(dWdI, C, invC, trC, Jc):
     dd = np.eye(3)
-    s = np.zeros((3, 3))
-    invC = np.linalg.inv(C)
-    # Fill 2ndPK
+    s = sym.zeros(3, 3)
     for i in range(0, 3, 1):
         for j in range(0, 3, 1):
-            delIdelC = [dd[i, j],
-                        np.trace(C) * dd[i, j] - C[i, j],
-                        0.5 * Jc * invC[i, j]]
-            sPk = np.matmul(delIdelC, np.array(dWdI))
-            s[i, j] = 2 * sPk
-    Spk = np.array([s[0,0], s[1,1], s[2,2], s[0,1], s[1,2], s[2,0]])
-    return Spk
-
-def elastic_moduli(dWdI, ddWdII, C, Jc):
-    dd = np.eye(3)
-    invC = np.linalg.inv(C)
-    moduli = np.zeros((6,6))
-    # Stress Indexes
-    ij = np.array([[0,0], [1,1], [2,2], [0,1], [1,2], [2,0]])
-    for r in range(0, 6, 1):
-        term1 = np.matmul(
-            [dd[ij[r,0], ij[r,1]],
-             np.trace(C) * dd[ij[r,0], ij[r,1]] - C[ij[r,0], ij[r,1]],
-             0.5 * Jc * invC[ij[r,0], ij[r,1]]
-            ], ddWdII
-        )
-        term2 = [4*dWdI[0], dWdI[0]]
-        for c in range(0, 6, 1):
-            term3 = np.transpose(
-                [dd[ij[c,0], ij[c,1]],
-                 np.trace(C) * dd[ij[c,0], ij[c,1]] - C[ij[c,0], ij[c,1]],
-                 0.5 * Jc * invC[ij[c,0], ij[c,1]]
+            delIdelC = sym.Matrix(
+                [
+                    [dd[i, j], trC * dd[i, j] - C[i, j], 0.5 * Jc * invC[i, j]]
                 ]
             )
-            lil_c = 0.5 * (invC[ij[r,0], ij[c,0]] * invC[ij[r,1], ij[c,1]] +
-                           invC[ij[r,0], ij[c,1]] * invC[ij[r,1], ij[c,0]])
-            term4 = [dd[ij[r,0], ij[r,1]] * dd[ij[c,0], ij[c,1]] - 
-                     0.5 * (dd[ij[r,0], ij[c,0]] * dd[ij[r,1], ij[c,1]] +
-                             dd[ij[r,0], ij[c,1]] * dd[ij[r,1], ij[c,0]]),
-                     Jc * (invC[ij[r,0], ij[r,1]] * invC[ij[c,0], ij[c,1]] -
-                           2*lil_c)
+            sPk = delIdelC * dWdI
+            s[i, j] = 2 * sPk
+    Spk = sym.Matrix([s[0,0], s[1,1], s[2,2], s[0,1], s[1,2], s[2,0]])
+    return Spk
+
+def elastic_moduli(dWdI, ddWdII, C, invC, trC, Jc):
+    dd = np.eye(3)
+    moduli = sym.zeros(6,6)
+    # Stress Indexes
+    ij = np.array([[0,0], [1,1], [2,2], [0,1], [1,2], [2,0]])
+    for r, (i, j) in enumerate(ij):
+        term1 = sym.Matrix(
+            [
+                [
+                    dd[i, j], 
+                    trC * dd[i, j] - C[i, j], 
+                    0.5 * Jc * invC[i, j]
+                ]
             ]
-            moduli[r, c] = 4*np.matmul(term1, term3) + np.matmul(term4, term2)
+        )
+        term1 = term1 * ddWdII
+        term4 = sym.Matrix(
+            [
+                [4*dWdI[0]], 
+                [dWdI[0]]
+            ]
+        )
+        for c, (k, l) in enumerate(ij):
+            term2 = sym.Matrix(
+                [
+                    [dd[k, l]],
+                    [trC * dd[k, l] - C[k, l]],
+                    [0.5 * Jc * invC[k, l]]
+                ]
+            )
+            lil_c = 0.5 * (invC[i, k] * invC[j, l] +
+                           invC[i, l] * invC[j, k])
+            term3 = sym.Matrix(
+                [
+                    [
+                        dd[i, k] * dd[k, l] - 0.5 * (dd[i, k] * dd[j, l] + dd[i, l] * dd[j, k]),
+                        Jc * (invC[i, j] * invC[k, l] - 2*lil_c)
+                    ]
+                ]
+            )
+            moduli[r, c] = 4 * term1 * term2 + term3 * term4
     return moduli
 
-def geometric_tangent_k(e, Spk, np_e, k_geo, detJ, el_type, el_order, order):
+def geometric_tangent_k(e, Spk, np_e, k_geo, detJ):
 
-    dim, n_el_n, xez, _, delPhi, _ = element_assign(el_type, el_order)
-    we, gp = gauss_num_int(el_type, order)
+    xez, _, delPhi = element_assign()
+    we, gp = gauss_num_int()
 
-    Spk = Spk[e]
-    jaco = abs(detJ[e])
+    s = Spk[e]
+    jac = abs(detJ[e])
     rc = np_e[e, :]
     ij = np.array([[0,0], [1,1], [2,2], [0,1], [1,2], [2,0]])
     Idn = np.eye(3)
 
-    for a in range(0, n_el_n, 1):
-        s = Spk[:, a] 
-        S = np.array(
-            [[s[0], s[3], s[5]], 
-             [s[3], s[1], s[4]],
-             [s[5], s[4], s[2]]]
-        )
-        g = 0
-        for b in range(0, n_el_n, 1):
+    for a in range(0, N_EL_N, 1):
+        for b in range(0, N_EL_N, 1):
             Gab = 0
-            for i in range(0, 3, 1):
-                for j in range(0, 3, 1):
-                    Gab += delPhi[i, a] * S[i, j] * delPhi[j, b]
+            g = 0
+            for n, (i, j) in enumerate(ij):
+                Gab += delPhi[i, a] * s[n] * delPhi[j, b]
             for q, w in enumerate(we):
-                g += w * float((Gab*jaco).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
-            k_geo[dim*(rc[a]-1):dim*(rc[a]-1)+3, dim*(rc[b]-1):dim*(rc[b]-1)+3] += g * Idn
+                g += w * float((Gab*jac).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
+            k_geo[DIM*(rc[a]-1):DIM*(rc[a]-1)+3, DIM*(rc[b]-1):DIM*(rc[b]-1)+3] += g * Idn
 
     return k_geo
     
-def gauss_int_fsol(e, Bmat, detJ, Smat, k_sol, np_e, el_type, el_order, order):
+def gauss_int_fsol(e, Bmat, detJ, Smat, k_sol, np_e):
      
-    dim, n_el_n, xez, _, _, _ = element_assign(el_type, el_order)
-    we, gp = gauss_num_int(el_type, order)
+    xez, _, _ = element_assign()
+    we, gp = gauss_num_int()
 
-    Bmat = Bmat[e]
-    BTra = Bmat.T
-    Smat = Smat[e]
-    jaco = abs(detJ[e])
+    bT = Bmat[e].T
+    s = Smat[e]
+    jac = abs(detJ[e])
     rc = np_e[e, :]
+    term = np.zeros(DIM*N_EL_N)
 
-    term = np.zeros(dim*n_el_n)
-    BtS = -1*np.matmul(BTra, Smat[:, 0]) 
-
-    for i in range(0, n_el_n, 1):
-        
+    for i in range(0, N_EL_N, 1):
+        bTs = -1 * bT[DIM*i:DIM*i+3, :] * s 
         for q, w in enumerate(we):
-            term[dim*i + 0] += w * float((BtS[0]*jaco).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
-            term[dim*i + 1] += w * float((BtS[1]*jaco).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
-            term[dim*i + 2] += w * float((BtS[2]*jaco).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
+            term[DIM*i + 0] += w * float((bTs[0]*jac).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
+            term[DIM*i + 1] += w * float((bTs[1]*jac).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
+            term[DIM*i + 2] += w * float((bTs[2]*jac).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
 
-        k_sol[dim*(rc[i]-1)+0] += term[dim*i + 0]
-        k_sol[dim*(rc[i]-1)+1] += term[dim*i + 1]
-        k_sol[dim*(rc[i]-1)+2] += term[dim*i + 2]
+        k_sol[DIM*(rc[i]-1) + 0] += term[DIM*i + 0]
+        k_sol[DIM*(rc[i]-1) + 1] += term[DIM*i + 1]
+        k_sol[DIM*(rc[i]-1) + 2] += term[DIM*i + 2]
 
     return k_sol
 
-def gauss_int_ftan(e, Bmat, detJ, Dmat, k_tan, np_e, el_type, el_order, order):
+def gauss_int_ftan(e, Bmat, detJ, Dmat, k_tan, np_e):
 
-    dim, n_el_n, xez, _, _, _ = element_assign(el_type, el_order)
-    we, gp = gauss_num_int(el_type, order)
+    xez, _, _ = element_assign()
+    we, gp = gauss_num_int()
 
-    Bmat = Bmat[e]
-    BTra = Bmat.T
-    Dmat = Dmat[e]
-    jaco = abs(detJ[e])
+    b = Bmat[e]
+    d = Dmat[e]
+    jac = abs(detJ[e])
 
     rc = np_e[e, :]
-    term_tan = np.zeros((Bmat.shape[1], Bmat.shape[1]))
-
-    d = Dmat[0, :, :]
-    term = np.matmul(BTra, d) 
-    term = np.matmul(term, Bmat)
+    term_tan = np.zeros((DIM*N_EL_N, DIM*N_EL_N))
 
     # Gauss Quadrature
-    for i in range(0, n_el_n, 1):
-        for j in range(0, n_el_n, 1):
+    for i in range(0, N_EL_N, 1):
+        term = b.T[DIM*i:DIM*i+3, :] * d * b[:, DIM*i:DIM*i+3]
+        for j in range(0, N_EL_N, 1):
             for q, w in enumerate(we):
                 # [1 2 3]
-                term_tan[dim*i+0, dim*j+0] += w * float((term[0, 0]*jaco).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
-                term_tan[dim*i+0, dim*j+1] += w * float((term[0, 1]*jaco).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
-                term_tan[dim*i+0, dim*j+2] += w * float((term[0, 2]*jaco).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
+                term_tan[DIM*i+0, DIM*j+0] += w * float((term[0, 0]*jac).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
+                term_tan[DIM*i+0, DIM*j+1] += w * float((term[0, 1]*jac).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
+                term_tan[DIM*i+0, DIM*j+2] += w * float((term[0, 2]*jac).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
                 # [4 5 6]
-                term_tan[dim*i+1, dim*j+0] += w * float((term[1, 0]*jaco).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
-                term_tan[dim*i+1, dim*j+1] += w * float((term[1, 1]*jaco).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
-                term_tan[dim*i+1, dim*j+2] += w * float((term[1, 2]*jaco).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
+                term_tan[DIM*i+1, DIM*j+0] += w * float((term[1, 0]*jac).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
+                term_tan[DIM*i+1, DIM*j+1] += w * float((term[1, 1]*jac).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
+                term_tan[DIM*i+1, DIM*j+2] += w * float((term[1, 2]*jac).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
                 # [4 5 6]
-                term_tan[dim*i+2, dim*j+0] += w * float((term[2, 0]*jaco).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
-                term_tan[dim*i+2, dim*j+1] += w * float((term[2, 1]*jaco).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
-                term_tan[dim*i+2, dim*j+2] += w * float((term[2, 2]*jaco).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
+                term_tan[DIM*i+2, DIM*j+0] += w * float((term[2, 0]*jac).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
+                term_tan[DIM*i+2, DIM*j+1] += w * float((term[2, 1]*jac).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
+                term_tan[DIM*i+2, DIM*j+2] += w * float((term[2, 2]*jac).subs({xez[0]: gp[q, 0], xez[1]: gp[q, 1], xez[2]: gp[q, 2]}))
             # [1 2 3]
-            k_tan[dim*(rc[i]-1)+0, dim*(rc[j]-1)+0] += term_tan[dim*i+0, dim*j+0]
-            k_tan[dim*(rc[i]-1)+0, dim*(rc[j]-1)+1] += term_tan[dim*i+0, dim*j+1] 
-            k_tan[dim*(rc[i]-1)+0, dim*(rc[j]-1)+2] += term_tan[dim*i+0, dim*j+2] 
+            k_tan[DIM*(rc[i]-1)+0, DIM*(rc[j]-1)+0] += term_tan[DIM*i+0, DIM*j+0]
+            k_tan[DIM*(rc[i]-1)+0, DIM*(rc[j]-1)+1] += term_tan[DIM*i+0, DIM*j+1] 
+            k_tan[DIM*(rc[i]-1)+0, DIM*(rc[j]-1)+2] += term_tan[DIM*i+0, DIM*j+2] 
             # [4 5 6]
-            k_tan[dim*(rc[i]-1)+1, dim*(rc[j]-1)+0] += term_tan[dim*i+1, dim*j+0] 
-            k_tan[dim*(rc[i]-1)+1, dim*(rc[j]-1)+1] += term_tan[dim*i+1, dim*j+1] 
-            k_tan[dim*(rc[i]-1)+1, dim*(rc[j]-1)+2] += term_tan[dim*i+1, dim*j+2] 
+            k_tan[DIM*(rc[i]-1)+1, DIM*(rc[j]-1)+0] += term_tan[DIM*i+1, DIM*j+0] 
+            k_tan[DIM*(rc[i]-1)+1, DIM*(rc[j]-1)+1] += term_tan[DIM*i+1, DIM*j+1] 
+            k_tan[DIM*(rc[i]-1)+1, DIM*(rc[j]-1)+2] += term_tan[DIM*i+1, DIM*j+2] 
             # [7 8 9]
-            k_tan[dim*(rc[i]-1)+2, dim*(rc[j]-1)+0] += term_tan[dim*i+2, dim*j+0] 
-            k_tan[dim*(rc[i]-1)+2, dim*(rc[j]-1)+1] += term_tan[dim*i+2, dim*j+1] 
-            k_tan[dim*(rc[i]-1)+2, dim*(rc[j]-1)+2] += term_tan[dim*i+2, dim*j+2] 
+            k_tan[DIM*(rc[i]-1)+2, DIM*(rc[j]-1)+0] += term_tan[DIM*i+2, DIM*j+0] 
+            k_tan[DIM*(rc[i]-1)+2, DIM*(rc[j]-1)+1] += term_tan[DIM*i+2, DIM*j+1] 
+            k_tan[DIM*(rc[i]-1)+2, DIM*(rc[j]-1)+2] += term_tan[DIM*i+2, DIM*j+2] 
 
     return k_tan
 
-def nonlinear_solve(u, np_n, np_e, con_type, c_vals, n_ele, num_pro, el_type, el_order, order):
+def nonlinear_solve(u, np_n, np_e, c_vals, n_ele, num_pro):
 
-    dim, _, _, _, _, _ = element_assign(el_type, el_order)
+    _, _, _ = element_assign()
 
     n_n = int(len(np_n[:, 0]))
     x = np_n[:, 1:].flatten() 
     x = x + u
 
-    k_sol = np.zeros(dim*n_n)
-    k_tan = np.zeros((dim*n_n, dim*n_n))
-    k_geo = np.zeros((dim*n_n, dim*n_n))
+    k_sol = np.zeros(DIM*n_n)
+    k_tan = np.zeros((DIM*n_n, DIM*n_n))
+    k_geo = np.zeros((DIM*n_n, DIM*n_n))
 
-    Bmat_Pool = mp.Pool(processes=num_pro)#, maxtasksperchild=100)
-    Smat_Pool = mp.Pool(processes=num_pro)#, maxtasksperchild=100)
-    Gmat_Pool = mp.Pool(processes=num_pro)#, maxtasksperchild=100)
-    Fsol_Pool = mp.Pool(processes=num_pro)#, maxtasksperchild=100)
-    Ftan_Pool = mp.Pool(processes=num_pro)#, maxtasksperchild=100)
+    Bmat_Pool = mp.Pool(processes=num_pro)
+    Smat_Pool = mp.Pool(processes=num_pro)
+    Gmat_Pool = mp.Pool(processes=num_pro)
+    Fsol_Pool = mp.Pool(processes=num_pro)
+    Ftan_Pool = mp.Pool(processes=num_pro)
 
     ele_list = range(0, n_ele, 1)
 
-    p_Bmat = partial(ref_B_mat, np_n=np_n, np_e=np_e, x=x, el_type=el_type, \
-                     el_order=el_order)
-    p_Smat = partial(constitutive_eqs, con_type=con_type, c_vals=c_vals, \
-                     np_n=np_n, np_e=np_e, x=x, el_type=el_type, el_order=el_order, order=order)
+    p_Bmat = partial(ref_B_mat, np_n=np_n, np_e=np_e, x=x)
+    p_Smat = partial(constitutive_eqs, c_vals=c_vals, np_n=np_n, np_e=np_e, x=x)
 
     Bmat_Results = Bmat_Pool.map(p_Bmat, ele_list)
     Bmats, detJs = zip(*Bmat_Results)
     Smat_Results = Smat_Pool.map(p_Smat, ele_list)
     Smats, Dmats = zip(*Smat_Results)
 
-    p_Gmat = partial(geometric_tangent_k, Spk=Smats, np_e=np_e, k_geo=k_geo, \
-                     detJ=detJs, el_type=el_type, el_order=el_order, order=order)
+    p_Gmat = partial(geometric_tangent_k, Spk=Smats, np_e=np_e, k_geo=k_geo, detJ=detJs)
     Kgeos = Gmat_Pool.map(p_Gmat, ele_list)
     Gmat = sum(Kgeos)
 
-    p_Fsol = partial(gauss_int_fsol, Bmat=Bmats, detJ=detJs, Smat=Smats, \
-                        k_sol=k_sol, np_e=np_e, el_type=el_type, el_order=el_order, order=order)
-    
-    p_Ftan = partial(gauss_int_ftan, Bmat=Bmats, detJ=detJs, Dmat=Dmats, \
-                        k_tan=k_tan, np_e=np_e, el_type=el_type, el_order=el_order, order=order)
+    p_Fsol = partial(gauss_int_fsol, Bmat=Bmats, detJ=detJs, Smat=Smats, k_sol=k_sol, np_e=np_e)
+    p_Ftan = partial(gauss_int_ftan, Bmat=Bmats, detJ=detJs, Dmat=Dmats,  k_tan=k_tan, np_e=np_e)
     
     Fsol_Results = Fsol_Pool.map(p_Fsol, ele_list)
     nrFunc = sum(Fsol_Results)
@@ -597,48 +486,38 @@ def nonlinear_solve(u, np_n, np_e, con_type, c_vals, n_ele, num_pro, el_type, el
 
     return nrFunc, (nrFtan + Gmat)
 
-def newton_raph(xn, nodes, np_n, np_e, n_ele, el_type, el_order, order, con_type, c_vals, num_pro, iters, tol):
-    nrFtanSolOld = np.zeros((int(len(np_n[:, 0]))*3, int(len(np_n[:, 0]))*3))
-    diff = np.zeros(int(len(np_n[:, 0]))*3)
+def newton_raph(xn, nodes, np_n, np_e, n_ele, c_vals, num_pro, iters, tol):
     for i in range(0, iters, 1):
-        nrFunc, nrFtan = nonlinear_solve(xn, np_n, np_e, con_type, c_vals, n_ele, num_pro, el_type, el_order, order)
+        nrFunc, nrFtan = nonlinear_solve(xn, np_n, np_e, c_vals, n_ele, num_pro)
         nrFtanSol = np.copy(nrFtan)
         if nodes != None:
             nrFunc[nodes] = 0
-            # print(nrFunc)
             for idx in nodes:
                 nrFtanSol[idx, :] = 0
-                nrFtanSol[:, idx] = 0
                 nrFtanSol[idx, idx] = nrFtan[idx, idx]
-        # print(nrFtan, nrFunc)
-        print(nrFtanSol, nrFunc)
         newtStep = np.matmul(np.linalg.inv(nrFtanSol), nrFunc)
         xn1 = xn - newtStep
-        # diff = np.c_[diff, (nrFtanSol - nrFtanSolOld).mean(axis=1)]
-        # j = diff.shape[1]  # Get the number of columns in 'diff'
-        # for row in range(0, diff.shape[0], 1):
-        #     plt.plot(list(range(0, j)), diff[row, :], label=f'Row {row + 1}')
-        
+        xn1 = np.round(xn1, 10)
+        xn = xn1
+
         print("Residual Average: {}".format(np.average(nrFunc)))
         print("Iteration Number: {}".format(i))
 
         if abs(np.average(nrFunc)) < tol:
             return xn1, i
-        # plt.plot(xn)
-        # plt.show()
-        xn = xn1
-        nrFtanSolOld = nrFtanSol
+
     # plt.show()
     print("Did not converge")
     return xn, iters
 
-def plot_disps(np_n, np_e, u, n_ele, el_type, el_order, order):
+def plot_disps(np_n, np_e, u, n_ele):
     plt.plot(u)
     plt.show()
-    cmap = get_cmap('Blues')
+    cmap = get_cmap('seismic')
+    # cmap = get_cmap('Blues')
 
-    dim, n_el_n, xez, phi, _, _ = element_assign(el_type, el_order)
-    _, gp = gauss_num_int(el_type, order)
+    xez, phi, _ = element_assign()
+    _, gp = gauss_num_int()
     x_gp = np.zeros(n_ele*len(gp))
     y_gp = np.zeros(n_ele*len(gp))
     z_gp = np.zeros(n_ele*len(gp))
@@ -647,8 +526,8 @@ def plot_disps(np_n, np_e, u, n_ele, el_type, el_order, order):
     w_gp = np.zeros(n_ele*len(gp))
 
     # Store disp vals
-    uvw = sym.zeros(n_el_n, dim)
-    xyz = sym.zeros(n_el_n, dim)
+    uvw = sym.zeros(N_EL_N, DIM)
+    xyz = sym.zeros(N_EL_N, DIM)
                        
     for e in range(0, n_ele, 1):
         # Set rows and columns GLOBAL
@@ -656,9 +535,9 @@ def plot_disps(np_n, np_e, u, n_ele, el_type, el_order, order):
 
         # Find coordinates and displacements
         for i, n in enumerate(rc):
-            uvw[i, 0] = u[(rc[i]-1)*dim]
-            uvw[i, 1] = u[(rc[i]-1)*dim+1]
-            uvw[i, 2] = u[(rc[i]-1)*dim+2]
+            uvw[i, 0] = u[(rc[i]-1)*DIM]
+            uvw[i, 1] = u[(rc[i]-1)*DIM+1]
+            uvw[i, 2] = u[(rc[i]-1)*DIM+2]
             xyz[i, 0] = np_n[np.where(np_n[:, 0] == n), 1][0]
             xyz[i, 1] = np_n[np.where(np_n[:, 0] == n), 2][0]
             xyz[i, 2] = np_n[np.where(np_n[:, 0] == n), 3][0]
