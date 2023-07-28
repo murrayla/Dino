@@ -9,11 +9,11 @@ import numpy as np
 import multiprocessing as mp
 
 # File Dependencies
-import dino
+import saur
 
 # Global Variables
 DIRECTORY = "GitHub/Dino/"
-FILE_NAME = "cubeTest"
+FILE_NAME = "oneTetTest"
 CONSTITUTIVE_TYPE = 0
 C_VALS = [0.092, 0.237]
 E_MOD = 200 
@@ -57,11 +57,11 @@ def main():
     u = np.zeros(n_n*dim)
     # nodes = None
     nodes = list()
-    u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC0=[0, 0, 0], BC1=[3, 0, 0], axi=0)
-    u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC0=[None, 0, None], BC1=[None, None, None], axi=1)
-    u, nodes = dino.apply_nonlinear_BC(np_n, u, nodes, BC0=[None, None, None], BC1=[None, None, None], axi=2)
+    u, nodes = saur.apply_nonlinear_BC(np_n, u, nodes, BC0=[0, 0, 0], BC1=[3, 0, 0], axi=0)
+    u, nodes = saur.apply_nonlinear_BC(np_n, u, nodes, BC0=[None, 0, None], BC1=[None, None, None], axi=1)
+    u, nodes = saur.apply_nonlinear_BC(np_n, u, nodes, BC0=[None, None, None], BC1=[None, None, None], axi=2)
     
-    root, it = dino.newton_raph(u, nodes, np_n, np_e, n_ele, C_VALS, NUM_PROCESSES, ITERATIONS, TOLERANCE)
+    root, it = saur.newton_raph(u, nodes, np_n, np_e, n_ele, C_VALS, NUM_PROCESSES, ITERATIONS, TOLERANCE)
     
     ## -- 
     ## END NEWTON RAPHSON ##
@@ -70,7 +70,7 @@ def main():
     print(root)
 
     # dino.plot_geo(np_n, np_e, root)
-    dino.plot_disps(np_n, np_e, root, n_ele)
+    saur.plot_disps(np_n, np_e, root, n_ele)
 
 if __name__ == '__main__':
     mp.freeze_support()

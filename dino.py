@@ -72,8 +72,8 @@ def element_assign():
     #           δφ1/δζ δφ2/δζ ... δφ10/δζ]
     delPhi = sym.Matrix(
         [
-            [sym.diff(phi[j], xi, 1)   for j in range(0, N_EL_N, 1)],  
-            [sym.diff(phi[k], eta, 1)  for k in range(0, N_EL_N, 1)],
+            [sym.diff(phi[j], xi, 1) for j in range(0, N_EL_N, 1)],  
+            [sym.diff(phi[k], eta, 1) for k in range(0, N_EL_N, 1)],
             [sym.diff(phi[m], zeta, 1) for m in range(0, N_EL_N, 1)]
         ]
     )
@@ -150,7 +150,6 @@ def nodes_and_elements(file_name, type_num):
         if count:
             count -= 1
             continue
-        # print(block.split(" ")[3])
         for j in range(int(block.split(" ")[3])):
             node_positions[int(nodes_list[i+j+1])] = (float(nodes_list[int(block.split(" ")[3])+i+j+1].split(" ")[0]), 
                                                       float(nodes_list[int(block.split(" ")[3])+i+j+1].split(" ")[1]), 
@@ -191,8 +190,8 @@ def deformation_gradient(X, x):
 
     _, gp = gauss_num_int()
 
-    Fdef = np.zeros((ORDER, DIM, DIM))
-    detF = np.zeros(ORDER)
+    Fdef = np.zeros((N_EL_N, DIM, DIM))
+    detF = np.zeros(N_EL_N)
 
     x = sym.Matrix(x)
     X = sym.Matrix(X)
@@ -204,7 +203,16 @@ def deformation_gradient(X, x):
     jXEZ = jXYZ.inv()
     dxyzdXYZ = jXEZ * jxyz
 
-    for i, p in enumerate(gp):
+    n_ps = np.array(
+        [
+            [1, 0, 0], [0, 1, 0], [0, 0, 1],
+            [0, 0, 0], [0.5, 0.5, 0], [0, 0.5, 0.5],
+            [0.5, 0, 0.5], [0.5, 0, 0], [0, 0, 0.5],
+            [0, 0.5, 0]
+        ]
+    )
+
+    for i, p in enumerate(n_ps):
         Fdef[i, :, :] = np.array(dxyzdXYZ.subs({xez[0]: p[0], xez[1]: p[1], xez[2]: p[2]})).astype(float)
         detF[i] = np.linalg.det(Fdef[i, :, :])
 
@@ -234,11 +242,38 @@ def ref_B_mat(e, np_n, np_e, x):
         X_ele[i] = np_n[n_idx, 1:DIM+1][0]
         x_ele[i] = xc[n_idx, :][0]
 
-    F, _ = deformation_gradient(X_ele, x_ele)
+    #########
+
+    Fdef = np.zeros((N_EL_N, DIM, DIM))
+
+    x = sym.Matrix(x_ele)
+    Xr = sym.Matrix(X_ele)
+
+    # Determine δ{xyz}/δ{xietazeta} Jacobians 
+    jxyz = delPhi * x
+    # Determine δ{XYZ}/δ{xietazeta} Jacboain and δ{uv}/δ{xy}
+    jXYZ = delPhi * Xr
+    jXEZ = jXYZ.inv()
+    dxyzdXYZ = jXEZ * jxyz
+
+    n_ps = np.array(
+        [
+            [1, 0, 0], [0, 1, 0], [0, 0, 1],
+            [0, 0, 0], [0.5, 0.5, 0], [0, 0.5, 0.5],
+            [0.5, 0, 0.5], [0.5, 0, 0], [0, 0, 0.5],
+            [0, 0.5, 0]
+        ]
+    )
+
+    for i, p in enumerate(n_ps):
+        Fdef[i, :, :] = np.array(dxyzdXYZ.subs({xez[0]: p[0], xez[1]: p[1], xez[2]: p[2]})).astype(float)
+
+    ##########
 
     # Jacobian
     jac = delPhi * X_ele
     detJ = jac.det()
+    b_sub = jac.inv() * delPhi
 
     # Initialize a matrix filled with zeros
     b_mat = sym.zeros(ORDER*DIM*2, N_EL_N*DIM)
@@ -246,34 +281,34 @@ def ref_B_mat(e, np_n, np_e, x):
 
     # Loop through each column index c
     for i, p in enumerate(gp):
-        f = F[i, :, :]
         for r, c in enumerate(range(0, DIM*N_EL_N, DIM)):
+            f = Fdef[r, :, :]
             # [F11φα,1 F21φα,1 F31φα,1] 
-            b_mat[ORDER*i+0, c+0] = f[0,0] * delPhi[0, r]
-            b_mat[ORDER*i+0, c+1] = f[1,0] * delPhi[0, r]
-            b_mat[ORDER*i+0, c+2] = f[2,0] * delPhi[0, r]
+            b_mat[ORDER*i+0, c+0] = f[0,0] * b_sub[0, r]
+            b_mat[ORDER*i+0, c+1] = f[1,0] * b_sub[0, r]
+            b_mat[ORDER*i+0, c+2] = f[2,0] * b_sub[0, r]
             # [F12φα,2 F22φα,2 F32φα,2]
-            b_mat[ORDER*i+1, c+0] = f[0,1] * delPhi[1, r]
-            b_mat[ORDER*i+1, c+1] = f[1,1] * delPhi[1, r]
-            b_mat[ORDER*i+1, c+2] = f[2,1] * delPhi[1, r]
+            b_mat[ORDER*i+1, c+0] = f[0,1] * b_sub[1, r]
+            b_mat[ORDER*i+1, c+1] = f[1,1] * b_sub[1, r]
+            b_mat[ORDER*i+1, c+2] = f[2,1] * b_sub[1, r]
             # [F13φα,3 F23φα,3 F33φα,3]
-            b_mat[ORDER*i+2, c+0] = f[0,2] * delPhi[2, r]
-            b_mat[ORDER*i+2, c+1] = f[1,2] * delPhi[2, r]
-            b_mat[ORDER*i+2, c+2] = f[2,2] * delPhi[2, r]
+            b_mat[ORDER*i+2, c+0] = f[0,2] * b_sub[2, r]
+            b_mat[ORDER*i+2, c+1] = f[1,2] * b_sub[2, r]
+            b_mat[ORDER*i+2, c+2] = f[2,2] * b_sub[2, r]
             # [F11φα,2 + F12φα,1 F21φα,2 + F22φα,1 F31φα,2 + F32φα,1]
-            b_mat[ORDER*i+3, c+0] = f[0,0] * delPhi[1, r] + f[0,1] * delPhi[0, r]
-            b_mat[ORDER*i+3, c+1] = f[1,0] * delPhi[1, r] + f[1,1] * delPhi[0, r]
-            b_mat[ORDER*i+3, c+2] = f[2,0] * delPhi[1, r] + f[2,1] * delPhi[0, r]
+            b_mat[ORDER*i+3, c+0] = f[0,0] * b_sub[1, r] + f[0,1] * b_sub[0, r]
+            b_mat[ORDER*i+3, c+1] = f[1,0] * b_sub[1, r] + f[1,1] * b_sub[0, r]
+            b_mat[ORDER*i+3, c+2] = f[2,0] * b_sub[1, r] + f[2,1] * b_sub[0, r]
             # [F12φα,3 + F13φα,2 F22φα,3 + F23φα,2 F32φα,3 + F33φα,2]
-            b_mat[ORDER*i+4, c+0] = f[0,1] * delPhi[2, r] + f[0,2] * delPhi[1, r]
-            b_mat[ORDER*i+4, c+1] = f[1,1] * delPhi[2, r] + f[1,2] * delPhi[1, r]
-            b_mat[ORDER*i+4, c+2] = f[2,1] * delPhi[2, r] + f[2,2] * delPhi[1, r]
+            b_mat[ORDER*i+4, c+0] = f[0,1] * b_sub[2, r] + f[0,2] * b_sub[1, r]
+            b_mat[ORDER*i+4, c+1] = f[1,1] * b_sub[2, r] + f[1,2] * b_sub[1, r]
+            b_mat[ORDER*i+4, c+2] = f[2,1] * b_sub[2, r] + f[2,2] * b_sub[1, r]
             # [F13φα,1 + F11φα,3 F23φα,1 + F21φα,3 F33φα,1 + F31φα,3]  
-            b_mat[ORDER*i+5, c+0] = f[0,2] * delPhi[0, r] + f[0,0] * delPhi[2, r]
-            b_mat[ORDER*i+5, c+1] = f[1,2] * delPhi[0, r] + f[1,0] * delPhi[2, r]
-            b_mat[ORDER*i+5, c+2] = f[2,2] * delPhi[0, r] + f[2,0] * delPhi[2, r]
+            b_mat[ORDER*i+5, c+0] = f[0,2] * b_sub[0, r] + f[0,0] * b_sub[2, r]
+            b_mat[ORDER*i+5, c+1] = f[1,2] * b_sub[0, r] + f[1,0] * b_sub[2, r]
+            b_mat[ORDER*i+5, c+2] = f[2,2] * b_sub[0, r] + f[2,0] * b_sub[2, r]
 
-            b_mat[ORDER*i:ORDER*i+6, :] = b_mat[ORDER*i:ORDER*i+6, :].subs({xez[0]: p[0], xez[1]: p[1], xez[2]: p[2]})
+        b_mat[ORDER*i:ORDER*i+6, :] = b_mat[ORDER*i:ORDER*i+6, :].subs({xez[0]: p[0], xez[1]: p[1], xez[2]: p[2]})
         jdet[i] = abs(detJ.subs({xez[0]: p[0], xez[1]: p[1], xez[2]: p[2]}))
 
     return np.array(b_mat).astype(float), np.array(jdet).astype(float)
@@ -299,12 +334,35 @@ def constitutive_eqs(e, c_vals, np_n, np_e, x):
         X_ele[i] = np_n[n_idx, 1:DIM+1][0]
         x_ele[i] = xc[n_idx, :][0]
 
-    F, J = deformation_gradient(X_ele, x_ele)
+    ######
+    xez, _, delPhi = element_assign()
+
+    _, gp = gauss_num_int()
+    Fdef = np.zeros((ORDER, DIM, DIM))
+    detF = np.zeros((ORDER, 1))
+
+    x = sym.Matrix(x_ele)
+    Xr = sym.Matrix(X_ele)
+
+    # Determine δ{xyz}/δ{xietazeta} Jacobians 
+    jxyz = delPhi * x
+    # Determine δ{XYZ}/δ{xietazeta} Jacboain and δ{uv}/δ{xy}
+    jXYZ = delPhi * Xr
+    jXEZ = jXYZ.inv()
+    dxyzdXYZ = jXEZ * jxyz
+
+    for i, p in enumerate(gp):
+        Fdef[i, :, :] = np.array(dxyzdXYZ.subs({xez[0]: p[0], xez[1]: p[1], xez[2]: p[2]})).astype(float)
+        detF[i] = np.linalg.det(Fdef[i, :, :])
+
+    detF = np.array(detF).astype(float)
+    
+    ######
     d = 1000.10
 
     for n in range(0, ORDER, 1):
-        f = F[n, :, :]
-        jac = J[n]
+        f = Fdef[n, :, :]
+        jac = detF[n, 0]
         c = f.T * f
         invC = np.linalg.inv(c)
         trC = c[0,0] + c[1,1] + c[2,2]
@@ -330,7 +388,7 @@ def second_piola(dWdI, C, invC, trC, Jc):
                 [dd[i, j], trC * dd[i, j] - C[i, j], 0.5 * Jc * invC[i, j]]
             ]
         )
-        sPk = delIdelC @ dWdI
+        sPk = np.matmul(delIdelC, dWdI)
         s[i, j] = 2 * sPk
     Spk = np.array([s[0,0], s[1,1], s[2,2], s[0,1], s[1,2], s[2,0]])
     return Spk
@@ -350,7 +408,7 @@ def elastic_moduli(dWdI, ddWdII, C, invC, trC, Jc):
                 ]
             ]
         )
-        term1 = term1 @ ddWdII
+        term1 = np.matmul(term1, ddWdII)
         term4 = np.array(
             [
                 [4*dWdI[0]], 
@@ -375,7 +433,7 @@ def elastic_moduli(dWdI, ddWdII, C, invC, trC, Jc):
                     ]
                 ]
             )
-            moduli[r, c] = 4 * term1 @ term2 + term3 @ term4
+            moduli[r, c] = 4 * np.matmul(term1, term2) + np.matmul(term3, term4)
     return moduli
 
 def geometric_tangent_k(e, Spk, np_e, k_geo, detJ):
@@ -417,7 +475,7 @@ def gauss_int_fsol(e, Bmat, detJ, Smat, k_sol, np_e):
 
     for i in range(0, N_EL_N, 1):
         for q, w in enumerate(we):
-            bTs = -1 * jac[q] * np.matmul(bT[DIM*i:DIM*i+3, q*ORDER:q*ORDER+6], s[:, q])
+            bTs = -1 * jac[q, 0] * np.matmul(bT[DIM*i:DIM*i+3, q*ORDER:q*ORDER+6], s[:, q])
             term[DIM*i:DIM*i+3] += w * bTs
 
         k_sol[DIM*(rc[i]-1):DIM*(rc[i]-1)+3] += term[DIM*i:DIM*i+3]
@@ -508,7 +566,6 @@ def newton_raph(xn, nodes, np_n, np_e, n_ele, c_vals, num_pro, iters, tol):
         if abs(np.average(nrFunc)) < tol:
             return xn1, i
 
-    # plt.show()
     print("Did not converge")
     return xn, iters
 
