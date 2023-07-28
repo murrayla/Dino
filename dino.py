@@ -376,6 +376,7 @@ def constitutive_eqs(e, c_vals, np_n, np_e, x):
         Smat[:, n] = second_piola(dWdI, c, invC, trC, jac)
         Dmat[n, :, :] = elastic_moduli(dWdI, ddWdII, c, invC, trC, jac)
     
+    print(Smat)
     return Smat, Dmat
 
 def second_piola(dWdI, C, invC, trC, Jc):

@@ -13,7 +13,7 @@ import dino
 
 # Global Variables
 DIRECTORY = "GitHub/Dino/"
-FILE_NAME = "cubeTest"
+FILE_NAME = "oneTetTest"
 CONSTITUTIVE_TYPE = 0
 C_VALS = [0.092, 0.237]
 E_MOD = 200 
