@@ -9,6 +9,7 @@ DIM = 3
 N_EL_N = 10
 ORDER = 5
 I = np.eye(DIM)
+IJ = np.array([[0,0], [1,1], [2,2], [0,1], [1,2], [2,0]])
 WE = np.array([-4/5, 9/20, 9/20, 9/20, 9/20])
 GP = np.array(
     [
@@ -87,49 +88,6 @@ def apply_nonlinear_BC(np_n, u, nodes, BC0, BC1, axi):
 
     return u, nodes
 
-def cur_B_mat(e, np_n, np_e, x):
-
-    n_n = int(len(np_n[:, 0]))
-    xc = x.reshape(n_n, DIM)
-    rc = np_e[e, :]
-
-    # Preallocate natural coordinates
-    x_ele = np.zeros((N_EL_N, DIM))
-
-    # Find coordinates for those nodes
-    np_n_idx = np_n[:, 0]
-    for i, local_node in enumerate(rc):
-        n_idx = np.where(np_n_idx == local_node)[0]
-        x_ele[i] = xc[n_idx, :][0]
-
-    # Jacobian
-    jac = dNdxez * x_ele
-    detJ  = jac.det()
-    dNdxyz = jac.inv() * dNdxez
-
-    # Initialize a matrix filled with zeros
-    b_mat = sym.zeros(DIM*2, N_EL_N*DIM)
-
-    # Loop through each column index c
-    for r, c in enumerate(range(0, DIM*N_EL_N, DIM)):
-        # [δφ/δx,      0,      0] 
-        b_mat[0, c+0] = dNdxyz[0, r]
-        # [    0,  δφ/δy,      0]
-        b_mat[1, c+1] = dNdxyz[1, r]
-        # [    0,      0,  δφ/δz]
-        b_mat[2, c+2] = dNdxyz[2, r]
-        # [δφ/δy,  δφ/δx,      0]
-        b_mat[3, c+0] = dNdxyz[1, r]
-        b_mat[3, c+1] = dNdxyz[0, r]
-        # [    0,  δφ/δz,  δφ/δy]
-        b_mat[4, c+1] = dNdxyz[2, r]
-        b_mat[4, c+2] = dNdxyz[1, r]
-        # [δφ/δz,      0,  δφ/δx]  
-        b_mat[5, c+0] = dNdxyz[2, r]
-        b_mat[5, c+2] = dNdxyz[0, r] 
-
-    return b_mat, detJ
-
 def constitutive_eqs(e, c_vals, np_n, np_e, x):
 
     d = 1000.10
@@ -159,7 +117,8 @@ def constitutive_eqs(e, c_vals, np_n, np_e, x):
     # Determine Jacobians 
     jcur = dNdxez * cur
     jref = dNdxez * ref
-    invJref = jref.inv()
+    # invJref = jref.inv()
+    invJref = jref.adjugate() / jref.det()
     symF = invJref * jcur
     detF = symF.det()
 
@@ -174,8 +133,6 @@ def constitutive_eqs(e, c_vals, np_n, np_e, x):
     ddWdII = sym.Matrix([[0, 0, 0], [0, 0, 0], [0, 0, 2*d]])
     sig = cauchy(dWdI, b, trb, detF)
     Dmat = d_moduli(dWdI, ddWdII,  b, trb, detF)
-
-    print(sig, Dmat)
     
     return sig, Dmat
 
@@ -237,134 +194,158 @@ def d_moduli(dWdI, ddWdII,  b, trb, jac):
             )
             d[r, c] = (term1 * term2) + (term3 * term4)
     return d
+   
+def gauss_int_fsol(e, x, np_n, sig, k_sol, np_e):
 
-def geometric_k(e, x, sig, np_n, np_e, k_geo, detJ):
-
-    s = sig[e]
-    jac = detJ[e]
-    rc = np_e[e, :]
-    ij = np.array([[0,0], [1,1], [2,2], [0,1], [1,2], [2,0]])
-
+    # Number of nodes and deformed x
     n_n = int(len(np_n[:, 0]))
     xc = x.reshape(n_n, DIM)
-
-    # Preallocate natural coordinates
-    x_ele = np.zeros((N_EL_N, DIM))
-
-    # Find coordinates for those nodes
-    np_n_idx = np_n[:, 0]
-
-    for i, local_node in enumerate(rc):
-        n_idx = np.where(np_n_idx == local_node)[0]
-        x_ele[i] = xc[n_idx, :][0]
-
-    # Jacobian
-    jcur = dNdxez * x_ele
-    dNdxyz = jcur.inv() * dNdxez
-
-    for a in range(0, N_EL_N, 1):
-        for b in range(0, N_EL_N, 1):
-            Gab = 0
-            g = 0
-            for n, (i, j) in enumerate(ij):
-                Gab += dNdxyz[i, a] * s[0, n] * dNdxyz[j, b]
-            for q, w in enumerate(WE):
-                g += w * float((Gab * jac).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
-            k_geo[DIM*(rc[a]-1):DIM*(rc[a]-1)+3, DIM*(rc[b]-1):DIM*(rc[b]-1)+3] += g * I
-
-    return k_geo
-    
-def gauss_int_fsol(e, Bmat, detJ, sig, k_sol, np_e):
-
-    bT = np.transpose(Bmat[e])
     s = sig[e]
-    jac = detJ[e]
     rc = np_e[e, :]
     BTsig = np.zeros(DIM*N_EL_N)
-    bTs = -1 * (jac * (bT * s.T))
+    cur = sym.zeros(N_EL_N, DIM)
+
+    # Relevant node numebers for element
+    rc = np_e[e, :]
+    np_n_idx = np_n[:, 0]
+    for i, local_node in enumerate(rc):
+        cur[i, :] = xc[np.where(np_n_idx == local_node), :][0]
+
+    jac = dNdxez * cur
+    detJ  = jac.det()
+    dNdxyz = jac.adjugate() / jac.det() * dNdxez
+
+    # Initialize a matrix filled with zeros
+    symB = sym.zeros(DIM*2, N_EL_N*DIM)
+
+    for r, c in enumerate(range(0, DIM*N_EL_N, DIM)):
+        # [δφ/δx,      0,      0] 
+        symB[0, c+0] = dNdxyz[0, r]
+        # [    0,  δφ/δy,      0]
+        symB[1, c+1] = dNdxyz[1, r]
+        # [    0,      0,  δφ/δz]
+        symB[2, c+2] = dNdxyz[2, r]
+        # [δφ/δy,  δφ/δx,      0]
+        symB[3, c+0] = dNdxyz[1, r]
+        symB[3, c+1] = dNdxyz[0, r]
+        # [    0,  δφ/δz,  δφ/δy]
+        symB[4, c+1] = dNdxyz[2, r]
+        symB[4, c+2] = dNdxyz[1, r]
+        # [δφ/δz,      0,  δφ/δx]  
+        symB[5, c+0] = dNdxyz[2, r]
+        symB[5, c+2] = dNdxyz[0, r] 
+
+    bTs = -1 * (detJ * (symB.T * s.T))
 
     for i in range(0, N_EL_N, 1):
         for q, w in enumerate(WE):
-            BTsig[DIM*i+0] += w * float((bTs[DIM*i+0]).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
-            BTsig[DIM*i+1] += w * float((bTs[DIM*i+1]).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
-            BTsig[DIM*i+2] += w * float((bTs[DIM*i+2]).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
+            Jac = detJ.subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]})
+            BTsig[DIM*i+0] += w * abs(Jac) * float((bTs[DIM*i+0]).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
+            BTsig[DIM*i+1] += w * abs(Jac) * float((bTs[DIM*i+1]).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
+            BTsig[DIM*i+2] += w * abs(Jac) * float((bTs[DIM*i+2]).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
             
 
         k_sol[DIM*(rc[i]-1):DIM*(rc[i]-1)+3] += BTsig[DIM*i:DIM*i+3]
 
     return k_sol
 
-def gauss_int_ftan(e, Bmat, detJ, Dmat, k_tan, np_e):
+def gauss_int_ftan(e, x, np_n, np_e, sig, Dmat, k_tan, k_geo):
 
-    b = Bmat[e]
-    bT = np.transpose(b)
+    # Number of nodes and deformed x
+    n_n = int(len(np_n[:, 0]))
+    xc = x.reshape(n_n, DIM)
+    cur = sym.zeros(N_EL_N, DIM)
     d = Dmat[e]
-    jac = detJ[e]
+    s = sig[e]
 
+    # Relevant node numebers for element
     rc = np_e[e, :]
+    np_n_idx = np_n[:, 0]
+    for i, local_node in enumerate(rc):
+        cur[i, :] = xc[np.where(np_n_idx == local_node), :][0]
+
+    jac = dNdxez * cur
+    detJ  = jac.det()
+    # dNdxyz = jac.inv() * dNdxez
+    dNdxyz = jac.adjugate() / jac.det() * dNdxez
+
+    # Initialize a matrix filled with zeros
+    symB = sym.zeros(DIM*2, N_EL_N*DIM)
+
+    for r, c in enumerate(range(0, DIM*N_EL_N, DIM)):
+        # [δφ/δx,      0,      0] 
+        symB[0, c+0] = dNdxyz[0, r]
+        # [    0,  δφ/δy,      0]
+        symB[1, c+1] = dNdxyz[1, r]
+        # [    0,      0,  δφ/δz]
+        symB[2, c+2] = dNdxyz[2, r]
+        # [δφ/δy,  δφ/δx,      0]
+        symB[3, c+0] = dNdxyz[1, r]
+        symB[3, c+1] = dNdxyz[0, r]
+        # [    0,  δφ/δz,  δφ/δy]
+        symB[4, c+1] = dNdxyz[2, r]
+        symB[4, c+2] = dNdxyz[1, r]
+        # [δφ/δz,      0,  δφ/δx]  
+        symB[5, c+0] = dNdxyz[2, r]
+        symB[5, c+2] = dNdxyz[0, r] 
+
     BTdB = np.zeros((DIM*N_EL_N, DIM*N_EL_N))
-    bTdb = np.matmul(np.matmul(bT, d), b) * jac
+    bTdb = np.matmul(np.matmul(symB.T, d), symB) * detJ
 
     # Gauss Quadrature
     for i in range(0, N_EL_N, 1):
         for j in range(0, N_EL_N, 1):
+            Gab = 0
+            g = 0
+            for n, (k, l) in enumerate(IJ):
+                Gab += dNdxyz[k, i] * s[0, n] * dNdxyz[l, j]
             for q, w in enumerate(WE):
+                Jac = detJ.subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]})
+                g += w * abs(Jac) * float((Gab).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
                 # [1, 2, 3]
-                BTdB[DIM*i+0, DIM*j+0] += w * float((bTdb[DIM*i+0, DIM*j+0]).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
-                BTdB[DIM*i+0, DIM*j+1] += w * float((bTdb[DIM*i+0, DIM*j+1]).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
-                BTdB[DIM*i+0, DIM*j+2] += w * float((bTdb[DIM*i+0, DIM*j+2]).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
+                BTdB[DIM*i+0, DIM*j+0] += w * abs(Jac) * float((bTdb[DIM*i+0, DIM*j+0]).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
+                BTdB[DIM*i+0, DIM*j+1] += w * abs(Jac) * float((bTdb[DIM*i+0, DIM*j+1]).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
+                BTdB[DIM*i+0, DIM*j+2] += w * abs(Jac) * float((bTdb[DIM*i+0, DIM*j+2]).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
                 # [4, 5, 3]
-                BTdB[DIM*i+1, DIM*j+0] += w * float((bTdb[DIM*i+1, DIM*j+0]).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
-                BTdB[DIM*i+1, DIM*j+1] += w * float((bTdb[DIM*i+1, DIM*j+1]).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
-                BTdB[DIM*i+1, DIM*j+2] += w * float((bTdb[DIM*i+1, DIM*j+2]).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
+                BTdB[DIM*i+1, DIM*j+0] += w * abs(Jac) * float((bTdb[DIM*i+1, DIM*j+0]).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
+                BTdB[DIM*i+1, DIM*j+1] += w * abs(Jac) * float((bTdb[DIM*i+1, DIM*j+1]).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
+                BTdB[DIM*i+1, DIM*j+2] += w * abs(Jac) * float((bTdb[DIM*i+1, DIM*j+2]).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
                 # [1, 2, 3]
-                BTdB[DIM*i+2, DIM*j+0] += w * float((bTdb[DIM*i+2, DIM*j+0]).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
-                BTdB[DIM*i+2, DIM*j+1] += w * float((bTdb[DIM*i+2, DIM*j+1]).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
-                BTdB[DIM*i+2, DIM*j+2] += w * float((bTdb[DIM*i+2, DIM*j+2]).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
+                BTdB[DIM*i+2, DIM*j+0] += w * abs(Jac) * float((bTdb[DIM*i+2, DIM*j+0]).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
+                BTdB[DIM*i+2, DIM*j+1] += w * abs(Jac) * float((bTdb[DIM*i+2, DIM*j+1]).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
+                BTdB[DIM*i+2, DIM*j+2] += w * abs(Jac) * float((bTdb[DIM*i+2, DIM*j+2]).subs({XI: GP[q, 0], ETA: GP[q, 1], ZETA: GP[q, 2]}))
 
             k_tan[DIM*(rc[i]-1):DIM*(rc[i]-1)+3, DIM*(rc[j]-1):DIM*(rc[j]-1)+3] += BTdB[DIM*i:DIM*i+3, DIM*j:DIM*j+3]
+            k_geo[DIM*(rc[i]-1):DIM*(rc[i]-1)+3, DIM*(rc[j]-1):DIM*(rc[j]-1)+3] += np.array(g * I).astype(np.float64)
 
-    return k_tan
+    return k_tan + k_geo
 
 def nonlinear_solve(u, np_n, np_e, c_vals, n_ele, num_pro):
 
+    # Preallocate
     n_n = int(len(np_n[:, 0]))
-    x = np_n[:, 1:].flatten() 
-    x = x + u
-
+    x = np_n[:, 1:].flatten() + u
     k_sol = np.zeros(DIM*n_n)
     k_tan = np.zeros((DIM*n_n, DIM*n_n))
     k_geo = np.zeros((DIM*n_n, DIM*n_n))
-
-    Bmat_Pool = mp.Pool(processes=num_pro)
-    sig_Pool = mp.Pool(processes=num_pro)
-    Gmat_Pool = mp.Pool(processes=num_pro)
-    Fsol_Pool = mp.Pool(processes=num_pro)
-    Ftan_Pool = mp.Pool(processes=num_pro)
-
     ele_list = range(0, n_ele, 1)
 
-    p_Bmat = partial(cur_B_mat, np_n=np_n, np_e=np_e, x=x)
+    sig_Pool = mp.Pool(processes=num_pro)
     p_sig = partial(constitutive_eqs, c_vals=c_vals, np_n=np_n, np_e=np_e, x=x)
-
-    Bmat_Results = Bmat_Pool.map(p_Bmat, ele_list)
-    Bmats, detJs = zip(*Bmat_Results)
     sig_Results = sig_Pool.map(p_sig, ele_list)
     sigs, Dmats = zip(*sig_Results)
 
-    p_Gmat = partial(geometric_k, x=x, sig=sigs, np_n=np_n, np_e=np_e, k_geo=k_geo, detJ=detJs)
-    Kgeos = Gmat_Pool.map(p_Gmat, ele_list)
-    Gmat = sum(Kgeos)
-
-    p_Fsol = partial(gauss_int_fsol, Bmat=Bmats, detJ=detJs, sig=sigs, k_sol=k_sol, np_e=np_e)
-    p_Ftan = partial(gauss_int_ftan, Bmat=Bmats, detJ=detJs, Dmat=Dmats,  k_tan=k_tan, np_e=np_e)
-    
+    Fsol_Pool = mp.Pool(processes=num_pro)
+    p_Fsol = partial(gauss_int_fsol, x=x, np_n=np_n, sig=sigs, k_sol=k_sol, np_e=np_e)
     Fsol_Results = Fsol_Pool.map(p_Fsol, ele_list)
     nrFunc = sum(Fsol_Results)
+
+    Ftan_Pool = mp.Pool(processes=num_pro)
+    p_Ftan = partial(gauss_int_ftan, x=x, np_n=np_n, np_e=np_e, sig=sigs, Dmat=Dmats,  k_tan=k_tan, k_geo=k_geo)
     Ftan_Results = Ftan_Pool.map(p_Ftan, ele_list)
     nrFtan = sum(Ftan_Results)
 
-    return nrFunc, (nrFtan + Gmat)
+    return nrFunc, nrFtan
 
 def newton_raph(xn, nodes, np_n, np_e, n_ele, c_vals, num_pro, iters, tol):
     for i in range(0, iters, 1):
@@ -396,8 +377,6 @@ def plot_disps(np_n, np_e, u, n_ele):
     cmap = get_cmap('seismic')
     # cmap = get_cmap('Blues')
 
-    xez, phi, _ = element_assign()
-    _, GP = gauss_num_int()
     x_gp = np.zeros(n_ele*len(GP))
     y_gp = np.zeros(n_ele*len(GP))
     z_gp = np.zeros(n_ele*len(GP))

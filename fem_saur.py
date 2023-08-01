@@ -6,6 +6,7 @@ DESCRIPTION: Generalised tool for solving PDEs with the Finite Element Method
 
 # Library Dependencies
 import numpy as np
+import sympy as sym
 import multiprocessing as mp
 
 # File Dependencies
@@ -19,8 +20,12 @@ C_VALS = [0.092, 0.237]
 E_MOD = 200 
 NU = 0.20
 NUM_PROCESSES = 4
-ITERATIONS = 10
+ITERATIONS = 30
 TOLERANCE = 1.48e-8
+XI = sym.Symbol('XI', real=True)
+ETA = sym.Symbol('ETA', real=True)
+ZETA = sym.Symbol('ZETA', real=True)
+beta = 1 - XI - ETA - ZETA # Dependent
 
 def main():
 
@@ -47,6 +52,33 @@ def main():
     n_ele = len(np_e[:, 0])
     n_n = int(len(np_n[:, 0]))
 
+        # Individual functions
+    # Corners
+    n1  = XI*(2*XI-1)        
+    n2  = ETA*(2*ETA-1)
+    n3  = ZETA*(2*ZETA-1)
+    n4  = beta*(2*beta-1)
+    # Edges
+    n5  = 4*XI*ETA
+    n6  = 4*ETA*ZETA
+    n7  = 4*ZETA*XI
+    n8  = 4*XI*beta
+    n9  = 4*ZETA*beta
+    n10 = 4*beta*ETA
+    # Shape Functions
+    phi = sym.Matrix([n1, n2, n3, n4, n5, n6, n7, n8, n9, n10])
+    # Derivative of Shape Functions
+    # dNdxez = [δφ1/δξ δφ2/δξ ... δφ10/δξ
+    #           δφ1/δξ δφ2/δξ ... δφ10/δξ
+    #           δφ1/δζ δφ2/δζ ... δφ10/δζ]
+    dNdxez = sym.Matrix(
+        [
+            [sym.diff(phi[j], XI, 1) for j in range(0, N_EL_N, 1)],  
+            [sym.diff(phi[k], ETA, 1) for k in range(0, N_EL_N, 1)],
+            [sym.diff(phi[m], ZETA, 1) for m in range(0, N_EL_N, 1)]
+        ]
+    )
+
     # --
     ## SETUP END ##
     
@@ -61,7 +93,7 @@ def main():
     u, nodes = apply_nonlinear_BC(np_n, u, nodes, BC0=[None, 0, None], BC1=[None, None, None], axi=1)
     u, nodes = apply_nonlinear_BC(np_n, u, nodes, BC0=[None, None, None], BC1=[None, None, None], axi=2)
     
-    root, it = newton_raph(u, nodes, np_n, np_e, n_ele, C_VALS, NUM_PROCESSES, ITERATIONS, TOLERANCE)
+    root, it = newton_raph(u, nodes, np_n, np_e, n_ele, dNdxez, C_VALS, NUM_PROCESSES, ITERATIONS, TOLERANCE)
     
     ## -- 
     ## END NEWTON RAPHSON ##
