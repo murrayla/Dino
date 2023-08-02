@@ -20,7 +20,7 @@ C_VALS = [0.092, 0.237]
 E_MOD = 200 
 NU = 0.20
 NUM_PROCESSES = 4
-ITERATIONS = 30
+ITERATIONS = 5
 TOLERANCE = 1.48e-8
 XI = sym.Symbol('XI', real=True)
 ETA = sym.Symbol('ETA', real=True)
@@ -69,7 +69,7 @@ def main():
     phi = sym.Matrix([n1, n2, n3, n4, n5, n6, n7, n8, n9, n10])
     # Derivative of Shape Functions
     # dNdxez = [δφ1/δξ δφ2/δξ ... δφ10/δξ
-    #           δφ1/δξ δφ2/δξ ... δφ10/δξ
+    #           δφ1/δη δφ2/δη ... δφ10/δη
     #           δφ1/δζ δφ2/δζ ... δφ10/δζ]
     dNdxez = sym.Matrix(
         [
