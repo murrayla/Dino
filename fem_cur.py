@@ -10,7 +10,7 @@ import sympy as sym
 import multiprocessing as mp
 
 # File Dependencies
-from saur_analytic import *
+from dino_cur import *
 
 # Global Variables
 DIRECTORY = "GitHub/Dino/"
