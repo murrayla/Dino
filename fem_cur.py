@@ -87,11 +87,11 @@ def main():
 
     dim = 3
     u = np.zeros(n_n*dim)
-    # nodes = None
-    nodes = list()
-    u, nodes = apply_nonlinear_BC(np_n, u, nodes, BC0=[0, 0, 0], BC1=[3, 0, 0], axi=0)
-    u, nodes = apply_nonlinear_BC(np_n, u, nodes, BC0=[None, 0, None], BC1=[None, None, None], axi=1)
-    u, nodes = apply_nonlinear_BC(np_n, u, nodes, BC0=[None, None, None], BC1=[None, None, None], axi=2)
+    nodes = None
+    # nodes = list()
+    # u, nodes = apply_nonlinear_BC(np_n, u, nodes, BC0=[0, 0, 0], BC1=[3, 0, 0], axi=0)
+    # u, nodes = apply_nonlinear_BC(np_n, u, nodes, BC0=[None, 0, None], BC1=[None, None, None], axi=1)
+    # u, nodes = apply_nonlinear_BC(np_n, u, nodes, BC0=[None, None, None], BC1=[None, None, None], axi=2)
     
     root, it = newton_raph(u, nodes, np_n, np_e, n_ele, dNdxez, C_VALS, NUM_PROCESSES, ITERATIONS, TOLERANCE)
     
