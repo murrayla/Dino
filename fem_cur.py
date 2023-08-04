@@ -22,10 +22,58 @@ NU = 0.20
 NUM_PROCESSES = 4
 ITERATIONS = 5
 TOLERANCE = 1.48e-8
-XI = sym.Symbol('XI', real=True)
-ETA = sym.Symbol('ETA', real=True)
-ZETA = sym.Symbol('ZETA', real=True)
-beta = 1 - XI - ETA - ZETA # Dependent
+GP = np.array(
+    [
+        [1/4, 1/4, 1/4], 
+        [1/2, 1/6, 1/6], 
+        [1/6, 1/2, 1/6], 
+        [1/6, 1/6, 1/2],
+        [1/6, 1/6, 1/6]
+    ]
+)
+
+""" 
+[Note: β = 1 - ξ - η - ζ]
+[
+    φ0 = ξ*(ξ-1), φ1 = η*(η-1), φ2 = ζ*(ζ-1), φ3 = β*(β-1)
+    φ4 = 4*ξ*η, φ5 = 4*η*ζ, φ6 = 4*ζ*ξ, φ7 = 4*ξ*β
+    φ8 = 4*ζ*β, φ9 = 4*β*η
+] @ Gauss
+"""
+PHI = np.zeros((ORDER, N_EL_N))
+"""
+[
+    δφ1/δξ δφ2/δξ ... δφ10/δξ
+    φ1/δη δφ2/δη ... δφ10/δη
+    φ1/δζ δφ2/δζ ... δφ10/δζ
+] @ Gauss
+"""
+DEL_PHI = np.zeros((ORDER, DIM, N_EL_N))
+
+for x in range(0, ORDER, 1):
+    # Shape Functions
+    PHI[x, :] = np.array(
+        [
+            GP[x, 0]*(2*GP[x, 0]-1),        
+            GP[x, 1]*(2*GP[x, 1]-1),
+            GP[x, 2]*(2*GP[x, 2]-1),
+            (1 - GP[x, 0] - GP[x, 1] - GP[x, 2])*(2*(1 - GP[x, 0] - GP[x, 1] - GP[x, 2])-1),
+            4*GP[x, 0]*GP[x, 1],
+            4*GP[x, 1]*GP[x, 2],
+            4*GP[x, 2]*GP[x, 0],
+            4*GP[x, 0]*(1 - GP[x, 0] - GP[x, 1] - GP[x, 2]),
+            4*GP[x, 2]*(1 - GP[x, 0] - GP[x, 1] - GP[x, 2]),
+            4*(1 - GP[x, 0] - GP[x, 1] - GP[x, 2])*GP[x, 1]
+        ]
+    )
+    # Derivatives of shape functions
+    DEL_PHI[x, :, :] = np.array(
+        [
+            [4*GP[x, 0] - 1, 0, 0, 4*GP[x, 1] + 4*GP[x, 0] + 4*GP[x, 2] - 3, 4*GP[x, 1], 0, 4*GP[x, 2], -4*GP[x, 1] - 8*GP[x, 0] - 4*GP[x, 2] + 4, -4*GP[x, 2], -4*GP[x, 1]], 
+            [0, 4*GP[x, 1] - 1, 0, 4*GP[x, 1] + 4*GP[x, 0] + 4*GP[x, 2] - 3, 4*GP[x, 0], 4*GP[x, 2], 0, -4*GP[x, 0], -4*GP[x, 2], -8*GP[x, 1] - 4*GP[x, 0] - 4*GP[x, 2] + 4], 
+            [0, 0, 4*GP[x, 2] - 1, 4*GP[x, 1] + 4*GP[x, 0] + 4*GP[x, 2] - 3, 0, 4*GP[x, 1], 4*GP[x, 0], -4*GP[x, 0], -4*GP[x, 1] - 4*GP[x, 0] - 8*GP[x, 2] + 4, -4*GP[x, 1]]
+        ]
+    )
 
 def main():
 
@@ -52,33 +100,6 @@ def main():
     n_ele = len(np_e[:, 0])
     n_n = int(len(np_n[:, 0]))
 
-        # Individual functions
-    # Corners
-    n1  = XI*(2*XI-1)        
-    n2  = ETA*(2*ETA-1)
-    n3  = ZETA*(2*ZETA-1)
-    n4  = beta*(2*beta-1)
-    # Edges
-    n5  = 4*XI*ETA
-    n6  = 4*ETA*ZETA
-    n7  = 4*ZETA*XI
-    n8  = 4*XI*beta
-    n9  = 4*ZETA*beta
-    n10 = 4*beta*ETA
-    # Shape Functions
-    phi = sym.Matrix([n1, n2, n3, n4, n5, n6, n7, n8, n9, n10])
-    # Derivative of Shape Functions
-    # dNdxez = [δφ1/δξ δφ2/δξ ... δφ10/δξ
-    #           δφ1/δη δφ2/δη ... δφ10/δη
-    #           δφ1/δζ δφ2/δζ ... δφ10/δζ]
-    dNdxez = sym.Matrix(
-        [
-            [sym.diff(phi[j], XI, 1) for j in range(0, N_EL_N, 1)],  
-            [sym.diff(phi[k], ETA, 1) for k in range(0, N_EL_N, 1)],
-            [sym.diff(phi[m], ZETA, 1) for m in range(0, N_EL_N, 1)]
-        ]
-    )
-
     # --
     ## SETUP END ##
     
@@ -93,7 +114,7 @@ def main():
     # u, nodes = apply_nonlinear_BC(np_n, u, nodes, BC0=[None, 0, None], BC1=[None, None, None], axi=1)
     # u, nodes = apply_nonlinear_BC(np_n, u, nodes, BC0=[None, None, None], BC1=[None, None, None], axi=2)
     
-    root, it = newton_raph(u, nodes, np_n, np_e, n_ele, dNdxez, C_VALS, NUM_PROCESSES, ITERATIONS, TOLERANCE)
+    root, it = newton_raph(u, nodes, np_n, np_e, n_ele, DEL_PHI, C_VALS, NUM_PROCESSES, ITERATIONS, TOLERANCE)
     
     ## -- 
     ## END NEWTON RAPHSON ##
@@ -102,7 +123,7 @@ def main():
     print(root)
 
     # dino.plot_geo(np_n, np_e, root)
-    plot_disps(np_n, np_e, root, n_ele)
+    plot_disps(np_n, np_e, root, n_ele, PHI)
 
 if __name__ == '__main__':
     mp.freeze_support()
