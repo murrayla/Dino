@@ -20,6 +20,11 @@ GP = np.array(
         [1/6, 1/6, 1/6]
     ]
 )
+TMAP = {
+        (0,0): 0, (1,1): 1, (2,2): 2, 
+        (0,1): 3, (1,0): 3, (1,2): 4, 
+        (2,1): 4, (2,0): 5, (0,2): 5
+}
 
 def apply_nonlinear_BC(np_n, u, nodes, BC0, BC1, axi):
 
@@ -61,7 +66,6 @@ def cur_B_mat(e, np_n, np_e, x, dN):
     # Preallocate
     cur = np.zeros((N_EL_N, DIM))
     bmat = np.zeros((ORDER, DIM*2, N_EL_N*DIM))
-    jdet = np.zeros(ORDER)
 
     # Number of nodes and deformed x
     n_n = int(len(np_n[:, 0]))
@@ -69,34 +73,32 @@ def cur_B_mat(e, np_n, np_e, x, dN):
 
     # Relevant node numebers for element
     rc = np_e[e, :]
-    np_n_idx = np_n[:, 0]
+    n_idx = np_n[:, 0]
     for i, local_node in enumerate(rc):
-        cur[i, :] = xc[np.where(np_n_idx == local_node), :][0]
+        cur[i, :] = xc[np.where(n_idx == local_node), :][0]
 
     # Loop through each column index c
     for q in range(0, ORDER, 1):
-        # J = [δx/δξ δy/δξ δz/δξ
-        #      δx/δη δy/δη δz/δη
-        #      δx/δζ δy/δζ δz/δζ] @ Gauss
+        # J = [∂x/∂ξ ∂y/∂ξ ∂z/∂ξ
+        #      ∂x/∂η ∂y/∂η ∂z/∂η
+        #      ∂x/∂ζ ∂y/∂ζ ∂z/∂ζ] @ Gauss
         jac = np.matmul(dN[q, :, :], cur).astype(np.float64)
-        # dNdxyz = [δφ1/δx δφ2/δx ... δφ10/δx
-        #           δφ1/δy δφ2/δy ... δφ10/δy
-        #           δφ1/δz δφ2/δz ... δφ10/δz] @ Gauss   
+        # dNdxyz = [∂φ1/∂x ∂φ2/∂x ... ∂φ10/∂x
+        #           ∂φ1/∂y ∂φ2/∂y ... ∂φ10/∂y
+        #           ∂φ1/∂z ∂φ2/∂z ... ∂φ10/∂z] @ Gauss   
         dNdxyz = np.matmul(np.linalg.inv(jac), dN[q, :, :])
-        # jdet = |J| @ Gauss
-        jdet[q] = float(abs(np.linalg.det(jac)))
         for r, c in enumerate(range(0, DIM*N_EL_N, DIM)):
-            bmat[q, 0, c+0] = dNdxyz[0, r] # [δφ/δx,      0,      0] 
-            bmat[q, 1, c+1] = dNdxyz[1, r] # [    0,  δφ/δy,      0]
-            bmat[q, 2, c+2] = dNdxyz[2, r] # [    0,      0,  δφ/δz]
-            bmat[q, 3, c+0] = dNdxyz[1, r] # [δφ/δy,  ...     ...
-            bmat[q, 3, c+1] = dNdxyz[0, r] #   ...    δφ/δx,      0]
-            bmat[q, 4, c+1] = dNdxyz[2, r] # [    0,  δφ/δz,  ...
-            bmat[q, 4, c+2] = dNdxyz[1, r] #   ...    ...     δφ/δy]
-            bmat[q, 5, c+0] = dNdxyz[2, r] # [δφ/δz,  ...     ...
-            bmat[q, 5, c+2] = dNdxyz[0, r] #   ...    ...     δφ/δx]
+            bmat[q, 0, c+0] = dNdxyz[0, r] # [∂φ/∂x,      0,      0] 
+            bmat[q, 1, c+1] = dNdxyz[1, r] # [    0,  ∂φ/∂y,      0]
+            bmat[q, 2, c+2] = dNdxyz[2, r] # [    0,      0,  ∂φ/∂z]
+            bmat[q, 3, c+0] = dNdxyz[1, r] # [∂φ/∂y,  ...     ...
+            bmat[q, 3, c+1] = dNdxyz[0, r] #   ...    ∂φ/∂x,      0]
+            bmat[q, 4, c+1] = dNdxyz[2, r] # [    0,  ∂φ/∂z,  ...
+            bmat[q, 4, c+2] = dNdxyz[1, r] #   ...    ...     ∂φ/∂y]
+            bmat[q, 5, c+0] = dNdxyz[2, r] # [∂φ/∂z,  ...     ...
+            bmat[q, 5, c+2] = dNdxyz[0, r] #   ...    ...     ∂φ/∂x]
 
-    return bmat, jdet
+    return bmat
 
 def constitutive_eqs(e, c_vals, np_n, np_e, x, dN):
 
@@ -107,13 +109,12 @@ def constitutive_eqs(e, c_vals, np_n, np_e, x, dN):
     # Preallocate 
     cur = np.zeros((N_EL_N, DIM))
     ref = np.zeros((N_EL_N, DIM))
-    sig = np.zeros((ORDER, DIM, DIM))
-    cau = np.zeros((ORDER, DIM*2))
+    cau = np.zeros((ORDER, DIM, DIM))
     Dmat = np.zeros((ORDER, DIM*2, DIM*2))
     Fdef = np.zeros((ORDER, DIM, DIM))
     fdet = np.zeros(ORDER)
 
-    # Relevant node numebers for element
+    # Relevant node numebrs for element
     rc = np_e[e, :]
     n_idx = np_n[:, 0]
     for i, local_node in enumerate(rc):
@@ -122,9 +123,9 @@ def constitutive_eqs(e, c_vals, np_n, np_e, x, dN):
 
     # Sub Gauss
     for q in range(0, ORDER, 1):
-        # F = [δx/δX δx/δY δx/δZ
-        #      δy/δX δy/δY δy/δZ
-        #      δz/δX δz/δY δz/δZ] @ Gauss
+        # F = [∂x/∂X ∂x/∂Y ∂x/∂Z
+        #      ∂y/∂X ∂y/∂Y ∂y/∂Z
+        #      ∂z/∂X ∂z/∂Y ∂z/∂Z] @ Gauss
         Fdef[q, :, :] = np.matmul(
             np.matmul(
                 np.linalg.inv(
@@ -150,91 +151,92 @@ def constitutive_eqs(e, c_vals, np_n, np_e, x, dN):
         # Second 
         ddWdII = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 2*d]])
         # σ = [σ11, σ22, σ33, σ12, σ23, σ31]
-        sig[n, :, :], cau[n, :] = cauchy(dWdI, b, trb, fdet[n])
+        cau[n, :, :] = cauchy(dWdI, b, trb, fdet[n])
         # Jdijkl
         Dmat[n, :, :] = d_moduli(dWdI, ddWdII,  b, trb, fdet[n])
     
-    return sig, cau, Dmat
+    return cau, Dmat
 
 def cauchy(dWdI, b, trb, jac):
     # Preallocate
-    s = np.zeros(DIM*2)
+    cau = np.zeros((DIM, DIM))
     # Fill cauchy stress
-    for n, (i, j) in enumerate(IJ):
-        dIdb = np.array(
-            [
+    for i in range(0, DIM, 1):
+        for j in range(0, DIM, 1):
+            # [bij, (I * bij - bim * bmj), 0.5 * J * δij]
+            dIdb = np.array(
                 [
-                    b[i, j], 
-                    trb * b[i, j] - (b[i, 0]*b[0, j] + b[i, 1]*b[1, j] + b[i, 2]*b[2, j]), 
-                    0.5 * jac * I[i, j]
+                    [
+                        b[i, j], 
+                        trb * b[i, j] - (b[i, 0]*b[0, j] + b[i, 1]*b[1, j] + b[i, 2]*b[2, j]), 
+                        0.5 * jac * I[i, j]
+                    ]
                 ]
-            ]
-        )
-        s[n] = np.matmul(dIdb, dWdI)
-    s *= 2/jac
-    cau = np.array(
-        [
-            [s[0], s[3], s[5]],
-            [s[3], s[1], s[4]],
-            [s[5], s[4], s[2]]
-        ]
-    )
-    return cau, s
+            )
+            cau[i, j] = np.matmul(dIdb, dWdI)
+    return 2/jac * cau
 
 def d_moduli(dWdI, ddWdII,  b, trb, jac):
 
     # Preallocate
     d = np.zeros((DIM*2,DIM*2))
-    # Fill moduli
+    # [4 * ∂W/∂II, ∂W/∂J]
     term4 = np.array(
         [
             [4*dWdI[0]], 
             [dWdI[0]]
         ]
     )
-    for r, (i, j) in enumerate(IJ):
-        term1 = np.array(
-            [
-                [
-                    b[i, j], 
-                    trb * b[i, j] - (b[i, 0]*b[0, j] + b[i, 1]*b[1, j] + b[i, 2]*b[2, j]), 
-                    0.5 * jac * I[i, j]
-                ]
-            ]
-        )
-        term1 = 4 * np.matmul(term1, ddWdII)
-        for c, (k, l) in enumerate(IJ):
-            term2 = np.array(
-                [
-                    [b[k, l]],
-                    [trb * b[k, l] - (b[k, 0]*b[0, l] + b[k, 1]*b[1, l] + b[k, 2]*b[2, l])],
-                    [0.5 * jac * I[k, l]]
-                ]
-            )
-            lil_b = 0.5 * (I[i, k] * I[j, l] + I[i, l] * I[j, k])
-            term3 = np.array(
+    for i in range(0, DIM, 1):
+        for j in range(0, DIM, 1):
+            # [bij, (I * bij - bim * bmj), 0.5 * J * δij]
+            term1 = np.array(
                 [
                     [
-                        b[i, j] *  b[k, l] - 0.5 * (b[i, k] * b[j, l] + b[i, l] * b[j, k]),
-                        jac * (I[i, j] * I[k, l] - 2*lil_b)
+                        b[i, j], 
+                        trb * b[i, j] - (b[i, 0]*b[0, j] + b[i, 1]*b[1, j] + b[i, 2]*b[2, j]), 
+                        0.5 * jac * I[i, j]
                     ]
                 ]
             )
-            d[r, c] = np.matmul(term1, term2) + np.matmul(term3, term4)
+            # 4 * term1 * [∂^2W/∂(I,II,J)^2]
+            term1 = 4 * np.matmul(term1, ddWdII)
+            for k in range(0, DIM, 1):
+                for l in range(0, DIM, 1):
+                    # [bkl, (I * bkl - bkm * bml), 0.5 * J * δkl]
+                    term2 = np.array(
+                        [
+                            [b[k, l]],
+                            [trb * b[k, l] - (b[k, 0]*b[0, l] + b[k, 1]*b[1, l] + b[k, 2]*b[2, l])],
+                            [0.5 * jac * I[k, l]]
+                        ]
+                    )
+                    # 0.5 * [δik * δjl + δil * δjk]
+                    lil_b = 0.5 * (I[i, k] * I[j, l] + I[i, l] * I[j, k])
+                    # [bij * bkl - 0.5 * (bik * bjl + bil * bjk), J * (δkl * δij - 2 * lil_b)]
+                    term3 = np.array(
+                        [
+                            [
+                                b[i, j] *  b[k, l] - 0.5 * (b[i, k] * b[j, l] + b[i, l] * b[j, k]),
+                                jac * (I[i, j] * I[k, l] - 2*lil_b)
+                            ]
+                        ]
+                    )
+                    # dijkl = term1 * term2 + term3 * term4
+                    d[TMAP[(i,j)], TMAP[(k,l)]] += np.matmul(term1, term2) + np.matmul(term3, term4)
+
     return d
 
-def gauss_int(e, x, np_n, np_e, sig, cau, bmat, detJ, dmat, kT, Fs, dN):
+def gauss_int(e, x, np_n, np_e, cau, bmat, dmat, kT, Fs, dN):
 
     # Number of nodes and deformed x
     n_n = int(len(np_n[:, 0]))
     xc = x.reshape(n_n, DIM)
     
     # Preallocate 
-    s = sig[e]
     c = cau[e]
     b = bmat[e]
     d = dmat[e]
-    jac = detJ[e]
     cur = np.zeros((N_EL_N, DIM))
 
     # Relevant node numebers for element
@@ -243,75 +245,80 @@ def gauss_int(e, x, np_n, np_e, sig, cau, bmat, detJ, dmat, kT, Fs, dN):
     for i, local_node in enumerate(rc):
         cur[i, :] = xc[np.where(n_idx == local_node), :][0]
 
+    Kab = np.zeros((DIM*N_EL_N, DIM*N_EL_N))
+    Gab = np.zeros((N_EL_N, N_EL_N))
+    Fa = np.zeros((DIM, N_EL_N))
+
+    for q, w in enumerate(WE):
+        # J = [∂x/∂ξ ∂y/∂ξ ∂z/∂ξ
+        #      ∂x/∂η ∂y/∂η ∂z/∂η
+        #      ∂x/∂ζ ∂y/∂ζ ∂z/∂ζ] @ Gauss
+        jac = np.matmul(dN[q, :, :], cur)
+        # dNdxyz = [∂φ1/∂x ∂φ2/∂x ... ∂φ10/∂x
+        #           ∂φ1/∂y ∂φ2/∂y ... ∂φ10/∂y
+        #           ∂φ1/∂z ∂φ2/∂z ... ∂φ10/∂z] @ Gauss                
+        dNdxyz = np.matmul(np.linalg.inv(jac), dN[q, :, :])
+        # jdet = |J| @ Gauss
+        jdet = abs(np.linalg.det(jac))
+        # ============================== #
+        # Solve Components
+        # ============================== #
+        # Material Stiffness Km = ∫ BαT * DT * Bβ * J dv
+        Kab += np.matmul(
+            np.matmul(
+                np.transpose(b[q, :, :]), d[q, :, :]
+            ), b[q, :, :]
+        ) * jdet * w
+        # Geometric / Initial Stiffness Gαβ = ∫ Nα,i * σij * Nβ,j * J dv 
+        Gab += np.matmul(
+            np.transpose(dNdxyz), np.matmul(c[q, :, :], dNdxyz)
+        ) * jdet * w 
+        # Residual Fα = - ∫ BαTσ * J dv OR Fα = - ∫ σ * ∂Nα/∂x * J
+        Fa += np.matmul(c[q, :, :], dNdxyz) * jdet * w
+
+    Fa *= (-1) 
+
     # Fill Fsol & Ftan
     # Loop rows
     for i in range(0, N_EL_N, 1):
-        # Preallocate residual array
-        Fa = np.zeros(DIM)
         # Loop columns
         for j in range(0, N_EL_N, 1):
-            # Preallocate Material Stiffness
-            Kab = np.zeros((DIM, DIM))
-            g = 0 
-            # Iterate Gauss Points
-            for q, w in enumerate(WE):
-                # J = [δx/δξ δy/δξ δz/δξ
-                #      δx/δη δy/δη δz/δη
-                #      δx/δζ δy/δζ δz/δζ] @ Gauss
-                jx_xi = np.matmul(dN[q, :, :], cur)
-                # dNdxyz = [δφ1/δx δφ2/δx ... δφ10/δx
-                #           δφ1/δy δφ2/δy ... δφ10/δy
-                #           δφ1/δz δφ2/δz ... δφ10/δz] @ Gauss                
-                # dNdxyz = np.matmul(np.linalg.inv(jx_xi), dN[q, :, :])
-                # Calculate numerical Gαβ = ∫ Nα,i * σij * Nβ,j * J dv
-                g += np.matmul(
-                    np.matmul(np.transpose(dN[q, :, i]), s[q, :, :]), dN[q, :, j]
-                ) * jac[q] * w
-                # Calculate numerical Km = ∫ BαT * DT * Bβ * J dv
-                Kab += np.matmul(
-                    np.matmul(np.transpose(b[q, :, 3*i:3*i+3]), d[q, :, :]), b[q, :, 3*j:3*j+3]
-                ) * jac[q] * w
-                # Only for Rows
-                if j == 0:
-                    # Calculate numerical F = - ∫ BTσ * J dv
-                    Fa += -1 * (
-                        np.matmul(np.transpose(b[q, :, 3*i:3*i+3]), c[q, :])
-                    ).astype(np.float64) * jac[q] * w
             # Allocate to Tangent
-            kT[DIM*(rc[i]-1):DIM*(rc[i]-1)+3, DIM*(rc[j]-1):DIM*(rc[j]-1)+3] += Kab + float(g) * I
+            kT[
+                DIM*(rc[i]-1):DIM*(rc[i]-1)+3, DIM*(rc[j]-1):DIM*(rc[j]-1)+3
+            ] += (Kab[DIM*i:DIM*i+DIM, DIM*j:DIM*j+DIM] + Gab[i, j] * I)
         # Allocate to Residual
-        Fs[DIM*(rc[i]-1):DIM*(rc[i]-1)+3] += Fa
+        Fs[DIM*(rc[i]-1):DIM*(rc[i]-1)+DIM] += Fa[:, i]
 
     return Fs, kT
 
-def nonlinear_solve(u, np_n, np_e, dN, c_vals, n_ele, num_pro):
+def nonlinear_solve(x, np_n, np_e, dN, c_vals, n_ele, num_pro):
 
     # Preallocate
     n_n = int(len(np_n[:, 0]))
     e_n = range(0, n_ele, 1)
     Fs = np.zeros(DIM*n_n)
     kT = np.zeros((DIM*n_n, DIM*n_n))
-    x = np_n[:, 1:].flatten() + u
    
     Bmat_Pool = mp.Pool(processes=num_pro)
     p_Bmat = partial(cur_B_mat, np_n=np_n, np_e=np_e, x=x, dN=dN)
-    Bmat_Results = Bmat_Pool.map(p_Bmat, e_n)
-    Bmats, detJs = zip(*Bmat_Results)
+    Bmats = Bmat_Pool.map(p_Bmat, e_n)
 
     sig_Pool = mp.Pool(processes=num_pro)
     p_sig = partial(constitutive_eqs, c_vals=c_vals, np_n=np_n, np_e=np_e, x=x, dN=dN)
     sig_Results = sig_Pool.map(p_sig, e_n)
-    sigs, cau, Dmats = zip(*sig_Results)
+    cau, Dmats = zip(*sig_Results)
 
     gau_Pool = mp.Pool(processes=num_pro)
-    g_sig = partial(gauss_int, x=x, np_n=np_n, np_e=np_e, sig=sigs, cau=cau, bmat=Bmats, \
-                    detJ=detJs, dmat=Dmats, kT=kT, Fs=Fs, dN=dN)
+    g_sig = partial(gauss_int, x=x, np_n=np_n, np_e=np_e, cau=cau, bmat=Bmats, \
+                    dmat=Dmats, kT=kT, Fs=Fs, dN=dN)
     gau_Results = gau_Pool.map(g_sig, e_n)
     Fsol_Results, Ftan_Results = zip(*gau_Results)
 
     return sum(Fsol_Results), sum(Ftan_Results)
 
-def newton_raph(xn, nodes, np_n, np_e, n_ele, dN, c_vals, num_pro, iters, tol):
+def newton_raph(u, nodes, np_n, np_e, n_ele, dN, c_vals, num_pro, iters, tol):
+    xn = np_n[:, 1:].flatten() + u 
     for i in range(0, iters, 1):
         nrFunc, nrFtan = nonlinear_solve(xn, np_n, np_e, dN, c_vals, n_ele, num_pro)
         nrFtanSol = np.copy(nrFtan)
@@ -321,8 +328,8 @@ def newton_raph(xn, nodes, np_n, np_e, n_ele, dN, c_vals, num_pro, iters, tol):
                 nrFtanSol[idx, :] = 0
                 nrFtanSol[:, idx] = 0
                 nrFtanSol[idx, idx] = nrFtan[idx, idx]
-        newtStep = np.matmul(np.linalg.inv(nrFtanSol), nrFunc)
-        xn1 = xn - newtStep
+        un = np.matmul(np.linalg.inv(nrFtanSol), nrFunc)
+        xn1 = xn + un
         xn = xn1
 
         SSE = sum(np.square(nrFunc))

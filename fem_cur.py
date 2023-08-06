@@ -20,8 +20,8 @@ C_VALS = [0.092, 0.237]
 E_MOD = 200 
 NU = 0.20
 NUM_PROCESSES = 4
-ITERATIONS = 5
-TOLERANCE = 1.48e-8
+ITERATIONS = 2
+TOLERANCE = 1e-8
 GP = np.array(
     [
         [1/4, 1/4, 1/4], 
@@ -44,8 +44,8 @@ PHI = np.zeros((ORDER, N_EL_N))
 """
 [
     δφ1/δξ δφ2/δξ ... δφ10/δξ
-    φ1/δη δφ2/δη ... δφ10/δη
-    φ1/δζ δφ2/δζ ... δφ10/δζ
+    δφ1/δη δφ2/δη ... δφ10/δη
+    δφ1/δζ δφ2/δζ ... δφ10/δζ
 ] @ Gauss
 """
 DEL_PHI = np.zeros((ORDER, DIM, N_EL_N))
