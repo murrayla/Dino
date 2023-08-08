@@ -14,13 +14,13 @@ from dino_cur import *
 
 # Global Variables
 DIRECTORY = "GitHub/Dino/"
-FILE_NAME = "oneTetTest"
+FILE_NAME = "cubeTest"
 CONSTITUTIVE_TYPE = 0
 C_VALS = [0.092, 0.237]
 E_MOD = 200 
 NU = 0.20
 NUM_PROCESSES = 4
-ITERATIONS = 2
+ITERATIONS = 4
 TOLERANCE = 1e-8
 GP = np.array(
     [
@@ -41,6 +41,7 @@ GP = np.array(
 ] @ Gauss
 """
 PHI = np.zeros((ORDER, N_EL_N))
+
 """
 [
     δφ1/δξ δφ2/δξ ... δφ10/δξ
@@ -108,11 +109,11 @@ def main():
 
     dim = 3
     u = np.zeros(n_n*dim)
-    nodes = None
-    # nodes = list()
-    # u, nodes = apply_nonlinear_BC(np_n, u, nodes, BC0=[0, 0, 0], BC1=[3, 0, 0], axi=0)
-    # u, nodes = apply_nonlinear_BC(np_n, u, nodes, BC0=[None, 0, None], BC1=[None, None, None], axi=1)
-    # u, nodes = apply_nonlinear_BC(np_n, u, nodes, BC0=[None, None, None], BC1=[None, None, None], axi=2)
+    # nodes = None
+    nodes = list()
+    u, nodes = apply_nonlinear_BC(np_n, u, nodes, BC0=[0, 0, 0], BC1=[3, 0, 0], axi=0)
+    u, nodes = apply_nonlinear_BC(np_n, u, nodes, BC0=[None, 0, None], BC1=[None, None, None], axi=1)
+    u, nodes = apply_nonlinear_BC(np_n, u, nodes, BC0=[None, None, None], BC1=[None, None, None], axi=2)
     
     root, it = newton_raph(u, nodes, np_n, np_e, n_ele, DEL_PHI, C_VALS, NUM_PROCESSES, ITERATIONS, TOLERANCE)
     

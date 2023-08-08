@@ -31,6 +31,10 @@ def apply_nonlinear_BC(np_n, u, nodes, BC0, BC1, axi):
     min_val = np.amin(np_n[:, axi+1])
     max_val = np.amax(np_n[:, axi+1])
 
+    # ============================== #
+    # Apply Boundary Conditions
+    # ============================== #
+
     # Apply Bounadry Conditions
     # Check position of node and apply BC if condition met
     for n in np_n[:, 0]:
@@ -77,12 +81,16 @@ def cur_B_mat(e, np_n, np_e, x, dN):
     for i, local_node in enumerate(rc):
         cur[i, :] = xc[np.where(n_idx == local_node), :][0]
 
+    # ============================== #
+    # Create B Matrix
+    # ============================== #
+
     # Loop through each column index c
     for q in range(0, ORDER, 1):
         # J = [∂x/∂ξ ∂y/∂ξ ∂z/∂ξ
         #      ∂x/∂η ∂y/∂η ∂z/∂η
         #      ∂x/∂ζ ∂y/∂ζ ∂z/∂ζ] @ Gauss
-        jac = np.matmul(dN[q, :, :], cur).astype(np.float64)
+        jac = np.matmul(dN[q, :, :], cur)
         # dNdxyz = [∂φ1/∂x ∂φ2/∂x ... ∂φ10/∂x
         #           ∂φ1/∂y ∂φ2/∂y ... ∂φ10/∂y
         #           ∂φ1/∂z ∂φ2/∂z ... ∂φ10/∂z] @ Gauss   
@@ -121,6 +129,10 @@ def constitutive_eqs(e, c_vals, np_n, np_e, x, dN):
         cur[i, :] = xc[np.where(n_idx == local_node), :][0]
         ref[i, :] = np_n[np.where(n_idx == local_node), 1:][0]
 
+    # ============================== #
+    # Determine Deformation Gradient
+    # ============================== #
+
     # Sub Gauss
     for q in range(0, ORDER, 1):
         # F = [∂x/∂X ∂x/∂Y ∂x/∂Z
@@ -134,7 +146,12 @@ def constitutive_eqs(e, c_vals, np_n, np_e, x, dN):
             ), cur
         )
         # fdet = |F| @ Gauss
-        fdet[q] = float(np.linalg.det(Fdef[q, :, :]))
+        fdet[q] = np.linalg.det(Fdef[q, :, :])
+
+    # ============================== #
+    # Find Elastic Moduli, D
+    # Determine Sigma, σ
+    # ============================== #
 
     # Nearly incompressible
     d = 1000.10
@@ -249,6 +266,10 @@ def gauss_int(e, x, np_n, np_e, cau, bmat, dmat, kT, Fs, dN):
     Gab = np.zeros((N_EL_N, N_EL_N))
     Fa = np.zeros((DIM, N_EL_N))
 
+    # ============================== #
+    # Integration of Kab, Gab, Fa
+    # ============================== #
+
     for q, w in enumerate(WE):
         # J = [∂x/∂ξ ∂y/∂ξ ∂z/∂ξ
         #      ∂x/∂η ∂y/∂η ∂z/∂η
@@ -259,10 +280,7 @@ def gauss_int(e, x, np_n, np_e, cau, bmat, dmat, kT, Fs, dN):
         #           ∂φ1/∂z ∂φ2/∂z ... ∂φ10/∂z] @ Gauss                
         dNdxyz = np.matmul(np.linalg.inv(jac), dN[q, :, :])
         # jdet = |J| @ Gauss
-        jdet = abs(np.linalg.det(jac))
-        # ============================== #
-        # Solve Components
-        # ============================== #
+        jdet = np.linalg.det(jac)
         # Material Stiffness Km = ∫ BαT * DT * Bβ * J dv
         Kab += np.matmul(
             np.matmul(
@@ -272,11 +290,15 @@ def gauss_int(e, x, np_n, np_e, cau, bmat, dmat, kT, Fs, dN):
         # Geometric / Initial Stiffness Gαβ = ∫ Nα,i * σij * Nβ,j * J dv 
         Gab += np.matmul(
             np.transpose(dNdxyz), np.matmul(c[q, :, :], dNdxyz)
-        ) * jdet * w 
+        ) * w 
         # Residual Fα = - ∫ BαTσ * J dv OR Fα = - ∫ σ * ∂Nα/∂x * J
-        Fa += np.matmul(c[q, :, :], dNdxyz) * jdet * w
+        Fa += np.matmul(c[q, :, :], dNdxyz) * w
 
     Fa *= (-1) 
+
+    # ============================== #
+    # Array allocation
+    # ============================== #
 
     # Fill Fsol & Ftan
     # Loop rows
@@ -318,6 +340,11 @@ def nonlinear_solve(x, np_n, np_e, dN, c_vals, n_ele, num_pro):
     return sum(Fsol_Results), sum(Ftan_Results)
 
 def newton_raph(u, nodes, np_n, np_e, n_ele, dN, c_vals, num_pro, iters, tol):
+
+    # ============================== #
+    # Newton Raphson Solver
+    # ============================== #
+
     xn = np_n[:, 1:].flatten() + u 
     for i in range(0, iters, 1):
         nrFunc, nrFtan = nonlinear_solve(xn, np_n, np_e, dN, c_vals, n_ele, num_pro)
@@ -341,7 +368,7 @@ def newton_raph(u, nodes, np_n, np_e, n_ele, dN, c_vals, num_pro, iters, tol):
             return xn1, i
 
     print("Did not converge")
-    return xn, iters
+    return xn - np_n[:, 1:].flatten(), iters
 
 def plot_disps(np_n, np_e, u, n_ele, phi):
     plt.plot(u)
