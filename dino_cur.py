@@ -5,11 +5,50 @@ import matplotlib.pyplot as plt
 from matplotlib.cm import get_cmap
 from functools import partial
 
+# data = [
+#     [0.9197896733368800, 0.0267367755543735, 0.0267367755543735, 0.0021900463965388],
+#     [0.0267367755543735, 0.9197896733368800, 0.0267367755543735, 0.0021900463965388],
+#     [0.0267367755543735, 0.0267367755543735, 0.9197896733368800, 0.0021900463965388],
+#     [0.0267367755543735, 0.0267367755543735, 0.0267367755543735, 0.0021900463965388],
+#     [0.1740356302468940, 0.7477598884818090, 0.0391022406356488, 0.0143395670177665],
+#     [0.7477598884818090, 0.1740356302468940, 0.0391022406356488, 0.0143395670177665],
+#     [0.1740356302468940, 0.0391022406356488, 0.7477598884818090, 0.0143395670177665],
+#     [0.7477598884818090, 0.0391022406356488, 0.1740356302468940, 0.0143395670177665],
+#     [0.1740356302468940, 0.0391022406356488, 0.0391022406356488, 0.0143395670177665],
+#     [0.7477598884818090, 0.0391022406356488, 0.0391022406356488, 0.0143395670177665],
+#     [0.0391022406356488, 0.1740356302468940, 0.7477598884818090, 0.0143395670177665],
+#     [0.0391022406356488, 0.7477598884818090, 0.1740356302468940, 0.0143395670177665],
+#     [0.0391022406356488, 0.1740356302468940, 0.0391022406356488, 0.0143395670177665],
+#     [0.0391022406356488, 0.7477598884818090, 0.0391022406356488, 0.0143395670177665],
+#     [0.0391022406356488, 0.0391022406356488, 0.1740356302468940, 0.0143395670177665],
+#     [0.0391022406356488, 0.0391022406356488, 0.7477598884818090, 0.0143395670177665],
+#     [0.4547545999844830, 0.4547545999844830, 0.0452454000155172, 0.0250305395686746],
+#     [0.4547545999844830, 0.0452454000155172, 0.4547545999844830, 0.0250305395686746],
+#     [0.4547545999844830, 0.0452454000155172, 0.0452454000155172, 0.0250305395686746],
+#     [0.0452454000155172, 0.4547545999844830, 0.4547545999844830, 0.0250305395686746],
+#     [0.0452454000155172, 0.4547545999844830, 0.0452454000155172, 0.0250305395686746],
+#     [0.0452454000155172, 0.0452454000155172, 0.4547545999844830, 0.0250305395686746],
+#     [0.5031186450145980, 0.2232010379623150, 0.2232010379623150, 0.0479839333057554],
+#     [0.2232010379623150, 0.5031186450145980, 0.2232010379623150, 0.0479839333057554],
+#     [0.2232010379623150, 0.2232010379623150, 0.5031186450145980, 0.0479839333057554],
+#     [0.5031186450145980, 0.2232010379623150, 0.0504792790607720, 0.0479839333057554],
+#     [0.2232010379623150, 0.5031186450145980, 0.0504792790607720, 0.0479839333057554],
+#     [0.2232010379623150, 0.2232010379623150, 0.0504792790607720, 0.0479839333057554],
+#     [0.5031186450145980, 0.0504792790607720, 0.2232010379623150, 0.0479839333057554],
+#     [0.2232010379623150, 0.0504792790607720, 0.5031186450145980, 0.0479839333057554],
+#     [0.2232010379623150, 0.0504792790607720, 0.2232010379623150, 0.0479839333057554],
+#     [0.0504792790607720, 0.5031186450145980, 0.2232010379623150, 0.0479839333057554],
+#     [0.0504792790607720, 0.2232010379623150, 0.5031186450145980, 0.0479839333057554],
+#     [0.0504792790607720, 0.2232010379623150, 0.2232010379623150, 0.0479839333057554],
+#     [0.2500000000000000, 0.2500000000000000, 0.2500000000000000, 0.0931745731195340]
+# ]
+
+# GP = np.array(data)[:, :3]
+# WE = np.array(data)[:, 3]
+
 DIM = 3
 N_EL_N = 10
-ORDER = 5
 I = np.eye(DIM)
-IJ = np.array([[0,0], [1,1], [2,2], [0,1], [1,2], [2,0]])
 WE = np.array([-4/5, 9/20, 9/20, 9/20, 9/20])
 GP = np.array(
     [
@@ -20,6 +59,7 @@ GP = np.array(
         [1/6, 1/6, 1/6]
     ]
 )
+ORDER = len(WE)
 TMAP = {
         (0,0): 0, (1,1): 1, (2,2): 2, 
         (0,1): 3, (1,0): 3, (1,2): 4, 
@@ -28,9 +68,6 @@ TMAP = {
 
 def apply_nonlinear_BC(np_n, u, nodes, BC0, BC1, axi):
 
-    min_val = np.amin(np_n[:, axi+1])
-    max_val = np.amax(np_n[:, axi+1])
-
     # ============================== #
     # Apply Boundary Conditions
     # ============================== #
@@ -38,30 +75,29 @@ def apply_nonlinear_BC(np_n, u, nodes, BC0, BC1, axi):
     # Apply Bounadry Conditions
     # Check position of node and apply BC if condition met
     for n in np_n[:, 0]:
-        n_idx = int(n)
         n_val = np_n[np_n[:, 0] == n, axi+1][0]
 
-        if n_val == min_val:
-            if BC0[0] is not None:
-                u[DIM*(n_idx-1)+0] = BC0[0]
-                nodes.append(DIM*(n_idx-1)+0)
-            if BC0[1] is not None:
-                u[DIM*(n_idx-1)+1] = BC0[1]
-                nodes.append(DIM*(n_idx-1)+1)
-            if BC0[2] is not None:
-                u[DIM*(n_idx-1)+2] = BC0[2]
-                nodes.append(DIM*(n_idx-1)+2)
+        if n_val == np.amin(np_n[:, axi+1]):
+            if BC0[0] is not None and (DIM*(int(n)-1)+0) not in nodes:
+                u[DIM*(int(n)-1)+0] = BC0[0]
+                nodes.append(DIM*(int(n)-1)+0)
+            if BC0[1] is not None and (DIM*(int(n)-1)+1) not in nodes:
+                u[DIM*(int(n)-1)+1] = BC0[1]
+                nodes.append(DIM*(int(n)-1)+1)
+            if BC0[2] is not None and (DIM*(int(n)-1)+2) not in nodes:
+                u[DIM*(int(n)-1)+2] = BC0[2]
+                nodes.append(DIM*(int(n)-1)+2)
 
-        elif n_val == max_val:
-            if BC1[0] is not None:
-                u[DIM*(n_idx-1)+0] = BC1[0]
-                nodes.append(DIM*(n_idx-1)+0)
-            if BC1[1] is not None:
-                u[DIM*(n_idx-1)+1] = BC1[1]
-                nodes.append(DIM*(n_idx-1)+1)
-            if BC1[2] is not None:
-                u[DIM*(n_idx-1)+2] = BC1[2]
-                nodes.append(DIM*(n_idx-1)+2)
+        elif n_val == np.amax(np_n[:, axi+1]):
+            if BC1[0] is not None and (DIM*(int(n)-1)+0) not in nodes:
+                u[DIM*(int(n)-1)+0] = BC1[0]
+                nodes.append(DIM*(int(n)-1)+0)
+            if BC1[1] is not None and (DIM*(int(n)-1)+1) not in nodes:
+                u[DIM*(int(n)-1)+1] = BC1[1]
+                nodes.append(DIM*(int(n)-1)+1)
+            if BC1[2] is not None and (DIM*(int(n)-1)+2) not in nodes:
+                u[DIM*(int(n)-1)+2] = BC1[2]
+                nodes.append(DIM*(int(n)-1)+2)
 
     return u, nodes
 
@@ -75,11 +111,9 @@ def cur_B_mat(e, np_n, np_e, x, dN):
     n_n = int(len(np_n[:, 0]))
     xc = x.reshape(n_n, DIM)
 
-    # Relevant node numebers for element
-    rc = np_e[e, :]
-    n_idx = np_n[:, 0]
-    for i, local_node in enumerate(rc):
-        cur[i, :] = xc[np.where(n_idx == local_node), :][0]
+    # Relevant node numbers for element
+    for i, local_node in enumerate(np_e[e, :]):
+        cur[i, :] = xc[np.where(np_n[:, 0] == local_node), :][0]
 
     # ============================== #
     # Create B Matrix
@@ -87,24 +121,31 @@ def cur_B_mat(e, np_n, np_e, x, dN):
 
     # Loop through each column index c
     for q in range(0, ORDER, 1):
-        # J = [∂x/∂ξ ∂y/∂ξ ∂z/∂ξ
-        #      ∂x/∂η ∂y/∂η ∂z/∂η
-        #      ∂x/∂ζ ∂y/∂ζ ∂z/∂ζ] @ Gauss
-        jac = np.matmul(dN[q, :, :], cur)
         # dNdxyz = [∂φ1/∂x ∂φ2/∂x ... ∂φ10/∂x
         #           ∂φ1/∂y ∂φ2/∂y ... ∂φ10/∂y
         #           ∂φ1/∂z ∂φ2/∂z ... ∂φ10/∂z] @ Gauss   
-        dNdxyz = np.matmul(np.linalg.inv(jac), dN[q, :, :])
+        dNdxyz = np.matmul(
+            np.linalg.inv(
+                np.matmul(dN[q, :, :], cur)
+            ), dN[q, :, :]
+        )
         for r, c in enumerate(range(0, DIM*N_EL_N, DIM)):
-            bmat[q, 0, c+0] = dNdxyz[0, r] # [∂φ/∂x,      0,      0] 
-            bmat[q, 1, c+1] = dNdxyz[1, r] # [    0,  ∂φ/∂y,      0]
-            bmat[q, 2, c+2] = dNdxyz[2, r] # [    0,      0,  ∂φ/∂z]
-            bmat[q, 3, c+0] = dNdxyz[1, r] # [∂φ/∂y,  ...     ...
-            bmat[q, 3, c+1] = dNdxyz[0, r] #   ...    ∂φ/∂x,      0]
-            bmat[q, 4, c+1] = dNdxyz[2, r] # [    0,  ∂φ/∂z,  ...
-            bmat[q, 4, c+2] = dNdxyz[1, r] #   ...    ...     ∂φ/∂y]
-            bmat[q, 5, c+0] = dNdxyz[2, r] # [∂φ/∂z,  ...     ...
-            bmat[q, 5, c+2] = dNdxyz[0, r] #   ...    ...     ∂φ/∂x]
+            # [∂φ/∂x,      0,      0] 
+            # [    0,  ∂φ/∂y,      0]
+            # [    0,      0,  ∂φ/∂z]
+            # [∂φ/∂y,  ∂φ/∂x,      0]
+            # [    0,  ∂φ/∂z,  ∂φ/∂y]
+            # [∂φ/∂z,      0,  ∂φ/∂x]
+            bmat[q, :, c:c+3] = np.array(
+                [
+                    [dNdxyz[0, r], 0, 0],
+                    [0, dNdxyz[1, r], 0],
+                    [0, 0, dNdxyz[2, r]],
+                    [dNdxyz[1, r], dNdxyz[0, r], 0],
+                    [0, dNdxyz[2, r], dNdxyz[1, r]],
+                    [dNdxyz[2, r], 0, dNdxyz[0, r]]
+                ]
+            )
 
     return bmat
 
@@ -124,10 +165,9 @@ def constitutive_eqs(e, c_vals, np_n, np_e, x, dN):
 
     # Relevant node numebrs for element
     rc = np_e[e, :]
-    n_idx = np_n[:, 0]
     for i, local_node in enumerate(rc):
-        cur[i, :] = xc[np.where(n_idx == local_node), :][0]
-        ref[i, :] = np_n[np.where(n_idx == local_node), 1:][0]
+        cur[i, :] = xc[np.where(np_n[:, 0] == local_node), :][0]
+        ref[i, :] = np_n[np.where(np_n[:, 0] == local_node), 1:][0]
 
     # ============================== #
     # Determine Deformation Gradient
@@ -154,19 +194,19 @@ def constitutive_eqs(e, c_vals, np_n, np_e, x, dN):
     # ============================== #
 
     # Nearly incompressible
-    d = 1000.10
+    d = 1000.1**-1
 
     for n in range(0, ORDER, 1):
         # b = F*F^T @ Gauss
         b = np.matmul(Fdef[n, :, :], np.transpose(Fdef[n, :, :]))
         trb = np.trace(b)
         # Mooney Rivlin
-        # W = c1(I1 - 3) + c2(I2-3) + d*(J-1)^2
+        # W = c1(I1 - 3) + c2(I2-3) + 1/d*(J-1)^2
         # Derivatives of Energy in terms of Invariants
         # First Order
-        dWdI = np.array([c_vals[0], c_vals[1], 2*d*(fdet[n]-1)])
-        # Second 
-        ddWdII = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 2*d]])
+        dWdI = np.array([c_vals[0], c_vals[1], 2/d*(fdet[n]-1)])
+        # Second Order
+        ddWdII = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 2/d]])
         # σ = [σ11, σ22, σ33, σ12, σ23, σ31]
         cau[n, :, :] = cauchy(dWdI, b, trb, fdet[n])
         # Jdijkl
@@ -264,7 +304,7 @@ def gauss_int(e, x, np_n, np_e, cau, bmat, dmat, kT, Fs, dN):
 
     Kab = np.zeros((DIM*N_EL_N, DIM*N_EL_N))
     Gab = np.zeros((N_EL_N, N_EL_N))
-    Fa = np.zeros((DIM, N_EL_N))
+    Fa = np.zeros((1, DIM*N_EL_N))
 
     # ============================== #
     # Integration of Kab, Gab, Fa
@@ -279,20 +319,22 @@ def gauss_int(e, x, np_n, np_e, cau, bmat, dmat, kT, Fs, dN):
         #           ∂φ1/∂y ∂φ2/∂y ... ∂φ10/∂y
         #           ∂φ1/∂z ∂φ2/∂z ... ∂φ10/∂z] @ Gauss                
         dNdxyz = np.matmul(np.linalg.inv(jac), dN[q, :, :])
-        # jdet = |J| @ Gauss
-        jdet = np.linalg.det(jac)
-        # Material Stiffness Km = ∫ BαT * DT * Bβ * J dv
+        # Material Stiffness Km = ∫ BαT * DT * Bβ dv
         Kab += np.matmul(
             np.matmul(
                 np.transpose(b[q, :, :]), d[q, :, :]
             ), b[q, :, :]
-        ) * jdet * w
-        # Geometric / Initial Stiffness Gαβ = ∫ Nα,i * σij * Nβ,j * J dv 
+        ) * w
+        # Geometric / Initial Stiffness Gαβ = ∫ Nα,i * σij * Nβ,j dv 
         Gab += np.matmul(
             np.transpose(dNdxyz), np.matmul(c[q, :, :], dNdxyz)
         ) * w 
-        # Residual Fα = - ∫ BαTσ * J dv OR Fα = - ∫ σ * ∂Nα/∂x * J
-        Fa += np.matmul(c[q, :, :], dNdxyz) * w
+        # Residual Fα = - ∫ BαTσ dv OR Fα = - ∫ σ * ∂Nα/∂x dv
+        # Fa += np.matmul(c[q, :, :], dNdxyz) * w
+        voigt = np.array([[c[q, 0, 0]], [c[q, 1, 1]], [c[q, 2, 2]], [c[q, 0, 1]], [c[q, 1, 2]], [c[q, 2, 0]]])
+        Fa += np.transpose(
+            np.matmul(np.transpose(b[q, :, :]), voigt)
+        ) * w
 
     Fa *= (-1) 
 
@@ -310,7 +352,7 @@ def gauss_int(e, x, np_n, np_e, cau, bmat, dmat, kT, Fs, dN):
                 DIM*(rc[i]-1):DIM*(rc[i]-1)+3, DIM*(rc[j]-1):DIM*(rc[j]-1)+3
             ] += (Kab[DIM*i:DIM*i+DIM, DIM*j:DIM*j+DIM] + Gab[i, j] * I)
         # Allocate to Residual
-        Fs[DIM*(rc[i]-1):DIM*(rc[i]-1)+DIM] += Fa[:, i]
+        Fs[DIM*(rc[i]-1):DIM*(rc[i]-1)+DIM] += Fa[0, DIM*i:DIM*i+3]
 
     return Fs, kT
 
@@ -349,13 +391,18 @@ def newton_raph(u, nodes, np_n, np_e, n_ele, dN, c_vals, num_pro, iters, tol):
     for i in range(0, iters, 1):
         nrFunc, nrFtan = nonlinear_solve(xn, np_n, np_e, dN, c_vals, n_ele, num_pro)
         nrFtanSol = np.copy(nrFtan)
+        nrFuncSol = np.copy(nrFunc)
         if nodes != None:
             nrFunc[nodes] = 0
             for idx in nodes:
                 nrFtanSol[idx, :] = 0
                 nrFtanSol[:, idx] = 0
-                nrFtanSol[idx, idx] = nrFtan[idx, idx]
+                nrFtanSol[idx, idx] = 1
+            # rhs = nrFuncSol - np.matmul(nrFtan, u)
+        #     un = np.matmul(np.linalg.inv(nrFtanSol), rhs)
+        # else:
         un = np.matmul(np.linalg.inv(nrFtanSol), nrFunc)
+
         xn1 = xn + un
         xn = xn1
 
@@ -365,7 +412,11 @@ def newton_raph(u, nodes, np_n, np_e, n_ele, dN, c_vals, num_pro, iters, tol):
         print("Iteration Number: {}".format(i))
 
         if SSE < tol:
-            return xn1, i
+            print(nodes)
+            plt.plot(nrFuncSol)
+            plt.show()
+            print(nrFuncSol)
+            return xn - np_n[:, 1:].flatten(), i
 
     print("Did not converge")
     return xn - np_n[:, 1:].flatten(), iters
@@ -373,15 +424,15 @@ def newton_raph(u, nodes, np_n, np_e, n_ele, dN, c_vals, num_pro, iters, tol):
 def plot_disps(np_n, np_e, u, n_ele, phi):
     plt.plot(u)
     plt.show()
-    cmap = get_cmap('seismic')
-    # cmap = get_cmap('Blues')
+    # cmap = get_cmap('seismic')
+    cmap = get_cmap('Blues')
 
-    x_gp = np.zeros(n_ele*len(GP))
-    y_gp = np.zeros(n_ele*len(GP))
-    z_gp = np.zeros(n_ele*len(GP))
-    u_gp = np.zeros(n_ele*len(GP))
-    v_gp = np.zeros(n_ele*len(GP))
-    w_gp = np.zeros(n_ele*len(GP))
+    x_gp = np.zeros(n_ele*len(WE))
+    y_gp = np.zeros(n_ele*len(WE))
+    z_gp = np.zeros(n_ele*len(WE))
+    u_gp = np.zeros(n_ele*len(WE))
+    v_gp = np.zeros(n_ele*len(WE))
+    w_gp = np.zeros(n_ele*len(WE))
 
     # Store disp vals
     uvw = sym.zeros(N_EL_N, DIM)
