@@ -1,5 +1,5 @@
 import numpy as np
-import sympy as sym
+import scipy as sp
 import multiprocessing as mp
 import matplotlib.pyplot as plt
 from matplotlib.cm import get_cmap
@@ -60,6 +60,7 @@ GP = np.array(
     ]
 )
 ORDER = len(WE)
+IJ = np.array([[0,0], [1,1], [2,2], [0,1], [1,2], [2,0]])
 TMAP = {
         (0,0): 0, (1,1): 1, (2,2): 2, 
         (0,1): 3, (1,0): 3, (1,2): 4, 
@@ -304,7 +305,7 @@ def gauss_int(e, x, np_n, np_e, cau, bmat, dmat, kT, Fs, dN):
 
     Kab = np.zeros((DIM*N_EL_N, DIM*N_EL_N))
     Gab = np.zeros((N_EL_N, N_EL_N))
-    Fa = np.zeros((1, DIM*N_EL_N))
+    Fa = np.zeros((N_EL_N*DIM, 1))
 
     # ============================== #
     # Integration of Kab, Gab, Fa
@@ -319,24 +320,26 @@ def gauss_int(e, x, np_n, np_e, cau, bmat, dmat, kT, Fs, dN):
         #           ∂φ1/∂y ∂φ2/∂y ... ∂φ10/∂y
         #           ∂φ1/∂z ∂φ2/∂z ... ∂φ10/∂z] @ Gauss                
         dNdxyz = np.matmul(np.linalg.inv(jac), dN[q, :, :])
-        # Material Stiffness Km = ∫ BαT * DT * Bβ dv
-        Kab += np.matmul(
-            np.matmul(
-                np.transpose(b[q, :, :]), d[q, :, :]
-            ), b[q, :, :]
-        ) * w
-        # Geometric / Initial Stiffness Gαβ = ∫ Nα,i * σij * Nβ,j dv 
-        Gab += np.matmul(
-            np.transpose(dNdxyz), np.matmul(c[q, :, :], dNdxyz)
-        ) * w 
-        # Residual Fα = - ∫ BαTσ dv OR Fα = - ∫ σ * ∂Nα/∂x dv
-        # Fa += np.matmul(c[q, :, :], dNdxyz) * w
+        # Voigt form of stress
         voigt = np.array([[c[q, 0, 0]], [c[q, 1, 1]], [c[q, 2, 2]], [c[q, 0, 1]], [c[q, 1, 2]], [c[q, 2, 0]]])
-        Fa += np.transpose(
-            np.matmul(np.transpose(b[q, :, :]), voigt)
-        ) * w
-
-    Fa *= (-1) 
+        for al in range(N_EL_N):
+            for be in range(N_EL_N):
+                # Geometric / Initial Stiffness Gαβ = ∫ Nα,i * σij * Nβ,j dv 
+                # g = 0
+                # for i, j in IJ:
+                #     g += dNdxyz[i, al] * c[q, i, j] * dNdxyz[j, be]
+                Gab[al, be] += np.matmul(
+                    np.transpose(dNdxyz[:, al]), np.matmul(c[q, :, :], dNdxyz[:, be])
+                ) * w 
+                # Gab[al, be] = g * w
+                                # Material Stiffness Km = ∫ BαT * DT * Bβ dv
+                Kab[DIM*al:DIM*al+DIM, DIM*be:DIM*be+DIM] += np.matmul(
+                    np.matmul(
+                        np.transpose(b[q, :, DIM*al:DIM*al+DIM]), d[q, :, :]
+                    ), b[q, :, DIM*be:DIM*be+DIM]
+                ) * w
+            # Residual Fα = - ∫ BαTσ dv OR Fα = - ∫ σ * ∂Nα/∂x dv
+            Fa[DIM*al:DIM*al+DIM] -= np.matmul(np.transpose(b[q, :, DIM*al:DIM*al+DIM]), voigt) * w
 
     # ============================== #
     # Array allocation
@@ -349,10 +352,10 @@ def gauss_int(e, x, np_n, np_e, cau, bmat, dmat, kT, Fs, dN):
         for j in range(0, N_EL_N, 1):
             # Allocate to Tangent
             kT[
-                DIM*(rc[i]-1):DIM*(rc[i]-1)+3, DIM*(rc[j]-1):DIM*(rc[j]-1)+3
+                DIM*(rc[i]-1):DIM*(rc[i]-1)+DIM, DIM*(rc[j]-1):DIM*(rc[j]-1)+DIM
             ] += (Kab[DIM*i:DIM*i+DIM, DIM*j:DIM*j+DIM] + Gab[i, j] * I)
         # Allocate to Residual
-        Fs[DIM*(rc[i]-1):DIM*(rc[i]-1)+DIM] += Fa[0, DIM*i:DIM*i+3]
+        Fs[DIM*(rc[i]-1):DIM*(rc[i]-1)+DIM] += Fa[DIM*i:DIM*i+3, 0]
 
     return Fs, kT
 
@@ -389,33 +392,47 @@ def newton_raph(u, nodes, np_n, np_e, n_ele, dN, c_vals, num_pro, iters, tol):
 
     xn = np_n[:, 1:].flatten() + u 
     for i in range(0, iters, 1):
-        nrFunc, nrFtan = nonlinear_solve(xn, np_n, np_e, dN, c_vals, n_ele, num_pro)
-        nrFtanSol = np.copy(nrFtan)
-        nrFuncSol = np.copy(nrFunc)
-        if nodes != None:
-            nrFunc[nodes] = 0
-            for idx in nodes:
-                nrFtanSol[idx, :] = 0
-                nrFtanSol[:, idx] = 0
-                nrFtanSol[idx, idx] = 1
-            # rhs = nrFuncSol - np.matmul(nrFtan, u)
-        #     un = np.matmul(np.linalg.inv(nrFtanSol), rhs)
+        nrF, nrKT = nonlinear_solve(xn, np_n, np_e, dN, c_vals, n_ele, num_pro)
+
+        nrKT_sol = np.copy(nrKT)
+        nrF_sol = np.copy(nrF)
+
+        # if nodes != None:
+        #     for idx in nodes:
+        #         nrKT_sol[idx, :] = 0
+        #         nrKT_sol[:, idx] = 0
+        #         nrKT_sol[idx, idx] = 1
+        #     rhs = nrF_sol - np.matmul(nrKT, u)
+        #     un = sp.linalg.solve(nrKT_sol, rhs)
         # else:
-        un = np.matmul(np.linalg.inv(nrFtanSol), nrFunc)
+        #     un = sp.linalg.solve(nrKT_sol, nrF)
+
+        if nodes != None:
+            nrF[nodes] = 0
+            for idx in nodes:
+                nrKT_sol[idx, :] = 0
+                nrKT_sol[:, idx] = 0
+                nrKT_sol[idx, idx] = nrKT[idx, idx]
+            un = sp.linalg.solve(nrKT_sol, nrF)
+        else:
+            un = sp.linalg.solve(nrKT_sol, nrF)
 
         xn1 = xn + un
+
+        SSR = sum(np.square(nrF))
+        SSU = sum(np.square(un))
+        
         xn = xn1
 
-        SSE = sum(np.square(nrFunc))
-
-        print("Residual Average: {}".format(SSE))
+        print("Sum of Squared (RESIDUAL): {}".format(SSR))
+        print("Sum of Squared (DELTA): {}".format(SSU))
         print("Iteration Number: {}".format(i))
 
-        if SSE < tol:
+        if SSR < tol or SSU < tol:
             print(nodes)
-            plt.plot(nrFuncSol)
+            plt.plot(nrF_sol)
             plt.show()
-            print(nrFuncSol)
+            print(nrF_sol)
             return xn - np_n[:, 1:].flatten(), i
 
     print("Did not converge")
@@ -435,8 +452,8 @@ def plot_disps(np_n, np_e, u, n_ele, phi):
     w_gp = np.zeros(n_ele*len(WE))
 
     # Store disp vals
-    uvw = sym.zeros(N_EL_N, DIM)
-    xyz = sym.zeros(N_EL_N, DIM)
+    uvw = np.zeros((N_EL_N, DIM))
+    xyz = np.zeros((N_EL_N, DIM))
                        
     for e in range(0, n_ele, 1):
         # Set rows and columns GLOBAL
