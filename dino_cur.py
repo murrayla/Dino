@@ -200,6 +200,7 @@ def constitutive_eqs(e, c_vals, np_n, np_e, x, dN):
     for n in range(0, ORDER, 1):
         # b = F*F^T @ Gauss
         b = np.matmul(Fdef[n, :, :], np.transpose(Fdef[n, :, :]))
+        # c = np.matmul(np.transpose(Fdef[n, :, :]), Fdef[n, :, :])
         trb = np.trace(b)
         # Mooney Rivlin
         # W = c1(I1 - 3) + c2(I2-3) + 1/d*(J-1)^2
@@ -210,7 +211,7 @@ def constitutive_eqs(e, c_vals, np_n, np_e, x, dN):
         ddWdII = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 2/d]])
         # σ = [σ11, σ22, σ33, σ12, σ23, σ31]
         cau[n, :, :] = cauchy(dWdI, b, trb, fdet[n])
-        # Jdijkl
+        # J * dijkl
         Dmat[n, :, :] = d_moduli(dWdI, ddWdII,  b, trb, fdet[n])
     
     return cau, Dmat
@@ -218,6 +219,7 @@ def constitutive_eqs(e, c_vals, np_n, np_e, x, dN):
 def cauchy(dWdI, b, trb, jac):
     # Preallocate
     cau = np.zeros((DIM, DIM))
+    # sPK = np.zeros((DIM, DIM))
     # Fill cauchy stress
     for i in range(0, DIM, 1):
         for j in range(0, DIM, 1):
@@ -231,8 +233,13 @@ def cauchy(dWdI, b, trb, jac):
                     ]
                 ]
             )
-            cau[i, j] = np.matmul(dIdb, dWdI)
-    return 2/jac * cau
+            cau[i, j] = 1/jac * np.matmul(dIdb, dWdI)
+
+            # sPK[i, j] = 2 * (
+            #     dWdI[0] * I[i, j] + dWdI[1] * 2 * c[i,j] + dWdI[2] * jac**2 * invC[i,j]
+            # )
+
+    return cau
 
 def d_moduli(dWdI, ddWdII,  b, trb, jac):
 
@@ -241,8 +248,8 @@ def d_moduli(dWdI, ddWdII,  b, trb, jac):
     # [4 * ∂W/∂II, ∂W/∂J]
     term4 = np.array(
         [
-            [4*dWdI[0]], 
-            [dWdI[0]]
+            [4*dWdI[1]], 
+            [dWdI[2]]
         ]
     )
     for i in range(0, DIM, 1):
@@ -275,13 +282,14 @@ def d_moduli(dWdI, ddWdII,  b, trb, jac):
                     term3 = np.array(
                         [
                             [
-                                b[i, j] *  b[k, l] - 0.5 * (b[i, k] * b[j, l] + b[i, l] * b[j, k]),
+                                b[i, j] * b[k, l] - 0.5 * (b[i, k] * b[j, l] + b[i, l] * b[j, k]),
                                 jac * (I[i, j] * I[k, l] - 2*lil_b)
                             ]
                         ]
                     )
                     # dijkl = term1 * term2 + term3 * term4
                     d[TMAP[(i,j)], TMAP[(k,l)]] += np.matmul(term1, term2) + np.matmul(term3, term4)
+                    # d[TMAP[(i,j)], TMAP[(k,l)]] += np.matmul(term1, term2) + np.matmul(term3, term4)
 
     return d
 
@@ -328,11 +336,12 @@ def gauss_int(e, x, np_n, np_e, cau, bmat, dmat, kT, Fs, dN):
                 # g = 0
                 # for i, j in IJ:
                 #     g += dNdxyz[i, al] * c[q, i, j] * dNdxyz[j, be]
+                # Gab[al, be] = g * w
+                                
                 Gab[al, be] += np.matmul(
                     np.transpose(dNdxyz[:, al]), np.matmul(c[q, :, :], dNdxyz[:, be])
                 ) * w 
-                # Gab[al, be] = g * w
-                                # Material Stiffness Km = ∫ BαT * DT * Bβ dv
+                # Material Stiffness Km = ∫ BαT * DT * Bβ dv
                 Kab[DIM*al:DIM*al+DIM, DIM*be:DIM*be+DIM] += np.matmul(
                     np.matmul(
                         np.transpose(b[q, :, DIM*al:DIM*al+DIM]), d[q, :, :]

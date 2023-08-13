@@ -13,13 +13,13 @@ from dino_cur import *
 
 # Global Variables
 DIRECTORY = "GitHub/Dino/"
-FILE_NAME = "cubeTest"
+FILE_NAME = "oneTetTest"
 CONSTITUTIVE_TYPE = 0
 C_VALS = [1, 1] #0.092,0.237]
 E_MOD = 200 
 NU = 0.20
 NUM_PROCESSES = 4
-ITERATIONS = 10
+ITERATIONS = 20
 TOLERANCE = 1e-8
 GP = np.array(
     [
@@ -149,14 +149,6 @@ def main():
 
     dim = 3
     u = np.zeros(n_n*dim)
-    # u = np.array(
-    #     [0,         0,          0,          0,          0,          0,
-    #         0,          1,          0,          0,          0,          0,
-    #         0.17297911,  0,          0,         -0.49423616, -0.0076786,   0,
-    #         0,         -0.1717379,   0,         0,          0,          0.17297911,
-    #         0.3552232,   0,          0.3552232,   0,         -0.0076786,  -0.49423616
-    #     ]
-    # )
     # nodes = None
     nodes = list()
     u, nodes = apply_nonlinear_BC(np_n, u, nodes, BC0=[0, None, None], BC1=[1, None, None], axi=0)
