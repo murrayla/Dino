@@ -200,8 +200,11 @@ def constitutive_eqs(e, c_vals, np_n, np_e, x, dN):
     for n in range(0, ORDER, 1):
         # b = F*F^T @ Gauss
         b = np.matmul(Fdef[n, :, :], np.transpose(Fdef[n, :, :]))
-        # c = np.matmul(np.transpose(Fdef[n, :, :]), Fdef[n, :, :])
+        c = np.matmul(np.transpose(Fdef[n, :, :]), Fdef[n, :, :])
+        fT = np.transpose(Fdef[n, :, :])
+        invC = np.linalg.inv(c)
         trb = np.trace(b)
+        trc = np.trace(c)
         # Mooney Rivlin
         # W = c1(I1 - 3) + c2(I2-3) + 1/d*(J-1)^2
         # Derivatives of Energy in terms of Invariants
@@ -210,41 +213,43 @@ def constitutive_eqs(e, c_vals, np_n, np_e, x, dN):
         # Second Order
         ddWdII = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 2/d]])
         # σ = [σ11, σ22, σ33, σ12, σ23, σ31]
-        cau[n, :, :] = cauchy(dWdI, b, trb, fdet[n])
+        cau[n, :, :] = cauchy(dWdI, b, trb, Fdef[n, :, :], fT, c, invC, trc, fdet[n])
         # J * dijkl
-        Dmat[n, :, :] = d_moduli(dWdI, ddWdII,  b, trb, fdet[n])
+        Dmat[n, :, :] = d_moduli(dWdI, ddWdII,  b, trb, Fdef[n, :, :], fT, c, invC, trc, fdet[n])
     
     return cau, Dmat
 
-def cauchy(dWdI, b, trb, jac):
+def cauchy(dWdI, b, trb, f, fT, c, invC, trc, jac):
     # Preallocate
-    cau = np.zeros((DIM, DIM))
-    # sPK = np.zeros((DIM, DIM))
+    # cau = np.zeros((DIM, DIM))
+    sPK = np.zeros((DIM, DIM))
     # Fill cauchy stress
     for i in range(0, DIM, 1):
         for j in range(0, DIM, 1):
-            # [bij, (I * bij - bim * bmj), 0.5 * J * δij]
-            dIdb = np.array(
-                [
-                    [
-                        b[i, j], 
-                        trb * b[i, j] - (b[i, 0]*b[0, j] + b[i, 1]*b[1, j] + b[i, 2]*b[2, j]), 
-                        0.5 * jac * I[i, j]
-                    ]
-                ]
-            )
-            cau[i, j] = 1/jac * np.matmul(dIdb, dWdI)
-
-            # sPK[i, j] = 2 * (
-            #     dWdI[0] * I[i, j] + dWdI[1] * 2 * c[i,j] + dWdI[2] * jac**2 * invC[i,j]
+            # # [bij, (I * bij - bim * bmj), 0.5 * J * δij]
+            # dIdb = np.array(
+            #     [
+            #         [
+            #             b[i, j], 
+            #             trb * b[i, j] - (b[i, 0]*b[0, j] + b[i, 1]*b[1, j] + b[i, 2]*b[2, j]), 
+            #             0.5 * jac * I[i, j]
+            #         ]
+            #     ]
             # )
+            # cau[i, j] = 1/jac * np.matmul(dIdb, dWdI)
 
-    return cau
+            sPK[i, j] = 2 * (
+                dWdI[0] * I[i, j] + dWdI[1] * (trc * I[i, j] - c[i, j]) + dWdI[2] * 0.5 * jac * invC[i, j]
+            )
 
-def d_moduli(dWdI, ddWdII,  b, trb, jac):
+    return 1/jac * np.matmul(np.matmul(f, sPK), fT)
+    # return cau
+
+def d_moduli(dWdI, ddWdII,  b, trb, f, fT, c, invC, trc, jac):
 
     # Preallocate
     d = np.zeros((DIM*2,DIM*2))
+    dspa = np.zeros((DIM*2,DIM*2))
     # [4 * ∂W/∂II, ∂W/∂J]
     term4 = np.array(
         [
@@ -289,9 +294,37 @@ def d_moduli(dWdI, ddWdII,  b, trb, jac):
                     )
                     # dijkl = term1 * term2 + term3 * term4
                     d[TMAP[(i,j)], TMAP[(k,l)]] += np.matmul(term1, term2) + np.matmul(term3, term4)
-                    # d[TMAP[(i,j)], TMAP[(k,l)]] += np.matmul(term1, term2) + np.matmul(term3, term4)
-
-    return d
+                    # dspa[TMAP[(i,j)], TMAP[(k,l)]] = 4 * (
+                    #     ddWdII[0, 0] * I[i, j] * I[k, l] + 
+                    #     ddWdII[0, 1] * I[i, j] * 2 * c[k, l] + 
+                    #     ddWdII[0, 2] * I[i, j] * jac**2 * invC[k, l] +
+                    #     ddWdII[1, 0] * 2 * c[i, j] * I[k, l] +
+                    #     ddWdII[1, 1] * 2 * c[i, j] * 2 * c[k, l] + 
+                    #     ddWdII[1, 2] * 2 * c[i, j] * jac**2 * invC[k, l] +
+                    #     ddWdII[2, 0] * jac**2 * invC[i, j] * I[k, l] +
+                    #     ddWdII[2, 1] * jac**2 * invC[i, j] * 2 * c[k, l] + 
+                    #     ddWdII[2, 2] * jac**2 * invC[i, j] * jac**2 * invC[k,l]
+                    # ) * f[i, j] * fT[i, j] * f[k, l] * fT[k, l]
+                    dspa[TMAP[(i,j)], TMAP[(k,l)]] += 4 * (
+                        (I[k, l]) * (
+                            ddWdII[0, 0] * I[i, j] + 
+                            dWdI[1] * I[i, j] + 
+                            ddWdII[0, 1] * (trc * I[i, j] - c[i, j]) + 
+                            ddWdII[0, 2] * 0.5 * jac * invC[i, j]
+                        ) +
+                        (trc * I[k, l] - c[k, l]) * (
+                            ddWdII[1, 0] * I[i, j] + 
+                            ddWdII[1, 1] * (trc * I[i, j] - c[i, j]) + 
+                            ddWdII[1, 2] * 0.5 * jac * invC[i, j]
+                        ) +
+                        (0.5 * jac * invC[k, l]) * (
+                            ddWdII[2, 0] * I[i, j] + 
+                            ddWdII[2, 1] * (trc * I[i, j] - c[i, j]) + 
+                            dWdI[2] * 0.5 * invC[i, j] + 
+                            ddWdII[2, 2] * 0.5 * jac * invC[i, j]
+                        )
+                    ) * f[i, j] * f[j, i] * f[k, l] * f[l, k]
+    return dspa
 
 def gauss_int(e, x, np_n, np_e, cau, bmat, dmat, kT, Fs, dN):
 
