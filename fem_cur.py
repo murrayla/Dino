@@ -151,8 +151,8 @@ def main():
     u = np.zeros(n_n*dim)
     # nodes = None
     nodes = list()
-    u, nodes = apply_nonlinear_BC(np_n, u, nodes, BC0=[0, None, None], BC1=[1, None, None], axi=0)
-    u, nodes = apply_nonlinear_BC(np_n, u, nodes, BC0=[None, 0, None], BC1=[None, 0, None], axi=1)
+    u, nodes = apply_nonlinear_BC(np_n, u, nodes, BC0=[0, None, None], BC1=[0, None, None], axi=0)
+    u, nodes = apply_nonlinear_BC(np_n, u, nodes, BC0=[None, 0, None], BC1=[None, 5, None], axi=1)
     u, nodes = apply_nonlinear_BC(np_n, u, nodes, BC0=[None, None, 0], BC1=[None, None, None], axi=2)
     
     root, it = newton_raph(u, nodes, np_n, np_e, n_ele, DEL_PHI, C_VALS, NUM_PROCESSES, ITERATIONS, TOLERANCE)
