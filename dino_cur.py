@@ -42,13 +42,9 @@ from functools import partial
 #     [0.0504792790607720, 0.2232010379623150, 0.2232010379623150, 0.0479839333057554],
 #     [0.2500000000000000, 0.2500000000000000, 0.2500000000000000, 0.0931745731195340]
 # ]
-
 # GP = np.array(data)[:, :3]
 # WE = np.array(data)[:, 3]
 
-DIM = 3
-N_EL_N = 10
-I = np.eye(DIM)
 WE = np.array([-4/5, 9/20, 9/20, 9/20, 9/20])
 GP = np.array(
     [
@@ -59,7 +55,11 @@ GP = np.array(
         [1/6, 1/6, 1/6]
     ]
 )
+
 ORDER = len(WE)
+DIM = 3
+N_EL_N = 10
+I = np.eye(DIM)
 IJ = np.array([[0,0], [1,1], [2,2], [0,1], [1,2], [2,0]])
 TMAP = {
         (0,0): 0, (1,1): 1, (2,2): 2, 
@@ -67,38 +67,129 @@ TMAP = {
         (2,1): 4, (2,0): 5, (0,2): 5
 }
 
-def apply_nonlinear_BC(np_n, u, nodes, BC0, BC1, axi):
+# def dirichlet_MINMAX(np_n, u, nodes, BC0, BC1, axi):
 
-    # ============================== #
-    # Apply Boundary Conditions
-    # ============================== #
+#     # ============================== #
+#     # Apply Boundary Conditions
+#     # ============================== #
 
-    # Apply Bounadry Conditions
-    # Check position of node and apply BC if condition met
+#     for n in np_n[:, 0]:
+#         n_val = np_n[np_n[:, 0] == n, axi+1][0]
+
+#         if n_val == np.amin(np_n[:, axi+1]):
+#             if BC0[0] is not None and (DIM*(int(n)-1)+0) not in nodes:
+#                 u[DIM*(int(n)-1)+0] = BC0[0]
+#                 nodes.append(DIM*(int(n)-1)+0)
+#             if BC0[1] is not None and (DIM*(int(n)-1)+1) not in nodes:
+#                 u[DIM*(int(n)-1)+1] = BC0[1]
+#                 nodes.append(DIM*(int(n)-1)+1)
+#             if BC0[2] is not None and (DIM*(int(n)-1)+2) not in nodes:
+#                 u[DIM*(int(n)-1)+2] = BC0[2]
+#                 nodes.append(DIM*(int(n)-1)+2)
+
+#         elif n_val == np.amax(np_n[:, axi+1]):
+#             if BC1[0] is not None and (DIM*(int(n)-1)+0) not in nodes:
+#                 u[DIM*(int(n)-1)+0] = BC1[0]
+#                 nodes.append(DIM*(int(n)-1)+0)
+#             if BC1[1] is not None and (DIM*(int(n)-1)+1) not in nodes:
+#                 u[DIM*(int(n)-1)+1] = BC1[1]
+#                 nodes.append(DIM*(int(n)-1)+1)
+#             if BC1[2] is not None and (DIM*(int(n)-1)+2) not in nodes:
+#                 u[DIM*(int(n)-1)+2] = BC1[2]
+#                 nodes.append(DIM*(int(n)-1)+2)
+
+#     return u, nodes
+
+def dirichlet_MINMAX(np_n, nodes, u):
+
+    # Notation: 
+    # AminB = Change in B coordinate at min A
+    # XminX = 0
+    # XminY = 0
+    # XminZ = 0
+    # YminX = 0
+    # YminY = 0
+    # YminZ = 0
+    ZminX = 0
+    ZminY = 0
+    ZminZ = 0
+    # CmaxD = Change in D coordinate at max C
+    # XmaxX = 0
+    # XmaxY = 0
+    # XmaxZ = 0
+    # YmaxX = 0
+    # YmaxY = 0
+    # YmaxZ = 0
+    ZmaxX = 0
+    ZmaxY = 0
+    ZmaxZ = -5
+    # cenEF = Change in values at centre of both E and F
+    cenXY = 0
+    # cenYZ = 0
+    # cenZX = 0
+
+    # ==== Apply BCs ==== #
     for n in np_n[:, 0]:
-        n_val = np_n[np_n[:, 0] == n, axi+1][0]
+        n_val = np_n[np_n[:, 0] == n, 1][0]
 
-        if n_val == np.amin(np_n[:, axi+1]):
-            if BC0[0] is not None and (DIM*(int(n)-1)+0) not in nodes:
-                u[DIM*(int(n)-1)+0] = BC0[0]
-                nodes.append(DIM*(int(n)-1)+0)
-            if BC0[1] is not None and (DIM*(int(n)-1)+1) not in nodes:
-                u[DIM*(int(n)-1)+1] = BC0[1]
-                nodes.append(DIM*(int(n)-1)+1)
-            if BC0[2] is not None and (DIM*(int(n)-1)+2) not in nodes:
-                u[DIM*(int(n)-1)+2] = BC0[2]
-                nodes.append(DIM*(int(n)-1)+2)
+        # Min X
+        # if n_val == np.amin(np_n[:, 1]):
+        #     u[DIM*(int(n)-1)+0] = XminX
+        #     nodes.append(DIM*(int(n)-1)+0)
+        #     u[DIM*(int(n)-1)+1] = XminY
+        #     nodes.append(DIM*(int(n)-1)+1)
+        #     u[DIM*(int(n)-1)+2] = XminZ
+        #     nodes.append(DIM*(int(n)-1)+2)
+        # Max X
+        # elif n_val == np.amax(np_n[:, 1]):
+        #     u[DIM*(int(n)-1)+0] = XmaxX
+        #     nodes.append(DIM*(int(n)-1)+0)
+        #     u[DIM*(int(n)-1)+1] = XmaxY
+        #     nodes.append(DIM*(int(n)-1)+1)
+        #     u[DIM*(int(n)-1)+2] = XmaxZ
+        #     nodes.append(DIM*(int(n)-1)+2)
 
-        elif n_val == np.amax(np_n[:, axi+1]):
-            if BC1[0] is not None and (DIM*(int(n)-1)+0) not in nodes:
-                u[DIM*(int(n)-1)+0] = BC1[0]
-                nodes.append(DIM*(int(n)-1)+0)
-            if BC1[1] is not None and (DIM*(int(n)-1)+1) not in nodes:
-                u[DIM*(int(n)-1)+1] = BC1[1]
-                nodes.append(DIM*(int(n)-1)+1)
-            if BC1[2] is not None and (DIM*(int(n)-1)+2) not in nodes:
-                u[DIM*(int(n)-1)+2] = BC1[2]
-                nodes.append(DIM*(int(n)-1)+2)
+        # Min Y
+        # if n_val == np.amin(np_n[:, 2]):
+        #     u[DIM*(int(n)-1)+0] = YminX
+        #     nodes.append(DIM*(int(n)-1)+0)
+        #     u[DIM*(int(n)-1)+1] = YminY
+        #     nodes.append(DIM*(int(n)-1)+1)
+        #     u[DIM*(int(n)-1)+2] = YminZ
+        #     nodes.append(DIM*(int(n)-1)+2)
+        # Max Y
+        # elif n_val == np.amax(np_n[:, 2]):
+        #     u[DIM*(int(n)-1)+0] = YmaxX
+        #     nodes.append(DIM*(int(n)-1)+0)
+        #     u[DIM*(int(n)-1)+1] = YmaxY
+        #     nodes.append(DIM*(int(n)-1)+1)
+        #     u[DIM*(int(n)-1)+2] = YmaxZ
+        #     nodes.append(DIM*(int(n)-1)+2)
+
+        # Min Z
+        if n_val == np.amin(np_n[:, 3]):
+            u[DIM*(int(n)-1)+0] = ZminX
+            nodes.append(DIM*(int(n)-1)+0)
+            u[DIM*(int(n)-1)+1] = ZminY
+            nodes.append(DIM*(int(n)-1)+1)
+            u[DIM*(int(n)-1)+2] = ZminZ
+            nodes.append(DIM*(int(n)-1)+2)
+        # Max Z
+        elif n_val == np.amax(np_n[:, 3]):
+            u[DIM*(int(n)-1)+0] = ZmaxX
+            nodes.append(DIM*(int(n)-1)+0)
+            u[DIM*(int(n)-1)+1] = ZmaxY
+            nodes.append(DIM*(int(n)-1)+1)
+            u[DIM*(int(n)-1)+2] = ZmaxZ
+            nodes.append(DIM*(int(n)-1)+2)
+
+        # X centreline
+        if abs(n_val - (np.amin(np_n[:, 0]) + np.amax(np_n[:, 0]))/2) < 0.05*np.amax(np_n[:, 0]) and \
+            abs(n_val - (np.amin(np_n[:, 1]) + np.amax(np_n[:, 1]))/2) < 0.05*np.amax(np_n[:, 1]):
+            u[DIM*(int(n)-1)+0] = cenXY
+            nodes.append(DIM*(int(n)-1)+0)
+            u[DIM*(int(n)-1)+1] = cenXY
+            nodes.append(DIM*(int(n)-1)+1)
 
     return u, nodes
 
@@ -297,7 +388,6 @@ def constitutive_eqs(e, c_vals, np_n, np_e, x, dN):
         f = dgr[n, :, :]
         b = np.matmul(f, np.transpose(f))
         c = np.matmul(np.transpose(f), f)
-        fT = np.transpose(f)
         invC = np.linalg.inv(c)
         trb = np.trace(b)
         trc = np.trace(c)
@@ -321,7 +411,7 @@ def constitutive_eqs(e, c_vals, np_n, np_e, x, dN):
 
         ## ==== Elastic Moduli === #
         d = np.zeros((DIM*2,DIM*2))
-        
+
         # [4 * ∂W/∂II, ∂W/∂J]
         term4 = np.array(
             [
