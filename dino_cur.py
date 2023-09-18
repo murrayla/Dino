@@ -146,6 +146,20 @@ def dirichlet(np_n, bcs):
 
     return u, np.array(nodes)
 
+def neumann(np_n, bcs):
+    rhs = np.zeros((np_n.shape[0], np_n.shape[1] - 1)).flatten()
+    nodes = list()
+
+    for i, (x, y, z) in enumerate(np_n[:, 1:]):
+        if abs(np.linalg.norm([x, y, z]) - bcs['pos']) < 1e-3:
+            rhs[DIM*i + 0] = bcs['val']
+            rhs[DIM*i + 1] = bcs['val']
+            rhs[DIM*i + 2] = bcs['val']
+
+        nodes.extend([DIM * i + 0, DIM * i + 1, DIM * i + 2])
+
+    return rhs, np.array(nodes)
+
 def nodes_and_elements(file_name, type_num):
 
     type_name = {2: "3-node-triangle", 3: "4-node-quadrangle", 4: "4-node-tetrahedron",  5: "8-node-hexahedron",  9: "6-node-second-order-triangle", 
@@ -519,7 +533,7 @@ def nonlinear_solve(x, np_n, np_e, dN, c_vals, n_ele, num_pro):
 
     return sum(Fsol_Results), sum(Ftan_Results)
 
-def newton_raph(u, nodes, np_n, np_e, n_ele, dN, c_vals, num_pro, iters, tol):
+def newton_raph(u, dir_n, rhs, neu_n, np_n, np_e, n_ele, dN, c_vals, num_pro, iters, tol):
 
     # ============================== #
     # Newton Raphson Solver
@@ -532,19 +546,12 @@ def newton_raph(u, nodes, np_n, np_e, n_ele, dN, c_vals, num_pro, iters, tol):
         nrKT_sol = np.copy(nrKT)
         nrF_sol = np.copy(nrF)
 
-        # if nodes != None:
-        #     for idx in nodes:
-        #         nrKT_sol[idx, :] = 0
-        #         nrKT_sol[:, idx] = 0
-        #         nrKT_sol[idx, idx] = 1
-        #     rhs = nrF_sol - np.matmul(nrKT, u)
-        #     un = sp.linalg.solve(nrKT_sol, rhs)
-        # else:
-        #     un = sp.linalg.solve(nrKT_sol, nrF)
+        if i == 0:
+            nrF[neu_n] = rhs[neu_n]
 
-        if len(nodes) > 0:
-            nrF[nodes] = 0
-            for idx in nodes:
+        if len(dir_n) > 0:
+            nrF[dir_n] = 0
+            for idx in dir_n:
                 nrKT_sol[idx, :] = 0
                 nrKT_sol[:, idx] = 0
                 nrKT_sol[idx, idx] = nrKT[idx, idx]
@@ -564,7 +571,7 @@ def newton_raph(u, nodes, np_n, np_e, n_ele, dN, c_vals, num_pro, iters, tol):
         print("Iteration Number: {}".format(i))
 
         if SSR < tol or SSU < tol:
-            print(nodes)
+            print(dir_n)
             # plt.plot(nrF_sol)
             # plt.show()
             print(nrF_sol)

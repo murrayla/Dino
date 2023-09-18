@@ -14,8 +14,9 @@ from dino_cur import *
 
 # Global Variables
 DIRECTORY = "GitHub/Dino/"
-FILE_NAME = "annulusTest"
-BASECASE = 1
+FILE_NAME = "simpleAnnulusTest"
+D_BASECASE = 1
+N_BASECASE = 0
 CONSTITUTIVE_TYPE = 0
 C_VALS = [1, 1] #0.092,0.237]
 E_MOD = 200 
@@ -148,53 +149,47 @@ def main():
     dim = 3
     u = np.zeros(n_n*dim)
 
-    # bcs = {
-    #     'min': {
-    #         'X': [X @ min X, Y @ min X, Z @ min X],
-    #         'Y': [X @ min Y, Y @ min Y, Z @ min Y],
-    #         'Z': [X @ min Z, Y @ min Z, Z @ min Z]
-    #     },
-    #     'max': {
-    #         'X': [X @ max X, Y @ max X, Z @ max X],
-    #         'Y': [X @ max Y, Y @ max Y, Z @ max Y],
-    #         'Z': [X @ max Z, Y @ max Z, Z @ max Z]
-    #     },
-    #     'center': {
-    #         'X': [X @ centre X, Y @ centre X, Z @ centre X],
-    #         'Y': [X @ centre Y, Y @ centre Y, Z @ centre Y],
-    #         'Z': [X @ centre Z, Y @ centre Z, Z @ centre Z]
-    #     },
-    # }
-    bcs = {
+    dir_bc = {
         'min': {
+            # [X @ min X, Y @ min X, Z @ min X]
             'X': [0, 0, 0],
             'Y': [None, 0, None],
             'Z': [None, None, None]
         },
         'max': {
+            # [X @ max X, Y @ max X, Z @ max X]
             'X': [20, 0, 0],
             'Y': [None, 0, None],
             'Z': [None, None, None]
         },
         'center': {
+            # [X @ centre X, Y @ centre X, Z @ centre X]
             'X': [None, None, None],
             'Y': [None, None, None],
             'Z': [None, None, None]
         },
     }
 
-    # Apply BCs
-    if BASECASE:
-        nodes = list()
+    if D_BASECASE:
+        dir_n = list()
     else:
-        nodes = list()
-        u, nodes = dirichlet(np_n, bcs)
+        u, dir_n = dirichlet(np_n, dir_bc)
 
-    print(nodes)
+    neu_bc = {
+        'val': 0.1,
+        'pos': 0.8
+    }
+
+    if N_BASECASE:
+        neu_n = list()
+    else:
+        rhs, neu_n = neumann(np_n, neu_bc)
+
+    print(rhs)
 
     # ==== Newton Raphson ==== # 
     
-    root, it = newton_raph(u, nodes, np_n, np_e, n_ele, DEL_PHI, C_VALS, NUM_PROCESSES, ITERATIONS, TOLERANCE)
+    root, it = newton_raph(u, dir_n, rhs, neu_n, np_n, np_e, n_ele, DEL_PHI, C_VALS, NUM_PROCESSES, ITERATIONS, TOLERANCE)
     print("After {} iterations we have:".format(it))
     print(root)
     
