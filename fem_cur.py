@@ -7,21 +7,22 @@ DESCRIPTION: Generalised tool for solving PDEs with the Finite Element Method
 # Library Dependencies
 import numpy as np
 import multiprocessing as mp
+import meshio
 
 # File Dependencies
 from dino_cur import *
 
 # Global Variables
 DIRECTORY = "GitHub/Dino/"
-FILE_NAME = "cylTest"
-BASECASE = 0
+FILE_NAME = "annulusTest"
+BASECASE = 1
 CONSTITUTIVE_TYPE = 0
 C_VALS = [1, 1] #0.092,0.237]
 E_MOD = 200 
 NU = 0.20
 NUM_PROCESSES = 4
 ITERATIONS = 100
-TOLERANCE = 1e-8
+TOLERANCE = 1e-6
 GP = np.array(
     [
         [1/4, 1/4, 1/4], 
@@ -122,7 +123,7 @@ def main():
     # ==== Setup ==== #
 
     # Intake Mesh
-    # nodes_and_elements(DIRECTORY + "gmsh_" + FILE_NAME + ".msh", type_num=11)
+    nodes_and_elements(DIRECTORY + "gmsh_" + FILE_NAME + ".msh", type_num=11)
     nodes = open(DIRECTORY + FILE_NAME + "_cvt2dino.nodes", 'r')
     elems = open(DIRECTORY + FILE_NAME + "_cvt2dino.ele", 'r')
     n_list = list()
@@ -147,12 +148,49 @@ def main():
     dim = 3
     u = np.zeros(n_n*dim)
 
+    # bcs = {
+    #     'min': {
+    #         'X': [X @ min X, Y @ min X, Z @ min X],
+    #         'Y': [X @ min Y, Y @ min Y, Z @ min Y],
+    #         'Z': [X @ min Z, Y @ min Z, Z @ min Z]
+    #     },
+    #     'max': {
+    #         'X': [X @ max X, Y @ max X, Z @ max X],
+    #         'Y': [X @ max Y, Y @ max Y, Z @ max Y],
+    #         'Z': [X @ max Z, Y @ max Z, Z @ max Z]
+    #     },
+    #     'center': {
+    #         'X': [X @ centre X, Y @ centre X, Z @ centre X],
+    #         'Y': [X @ centre Y, Y @ centre Y, Z @ centre Y],
+    #         'Z': [X @ centre Z, Y @ centre Z, Z @ centre Z]
+    #     },
+    # }
+    bcs = {
+        'min': {
+            'X': [0, 0, 0],
+            'Y': [None, 0, None],
+            'Z': [None, None, None]
+        },
+        'max': {
+            'X': [20, 0, 0],
+            'Y': [None, 0, None],
+            'Z': [None, None, None]
+        },
+        'center': {
+            'X': [None, None, None],
+            'Y': [None, None, None],
+            'Z': [None, None, None]
+        },
+    }
+
     # Apply BCs
     if BASECASE:
-        nodes = None
+        nodes = list()
     else:
         nodes = list()
-        u, nodes = dirichlet_MINMAX(np_n, nodes, u)
+        u, nodes = dirichlet(np_n, bcs)
+
+    print(nodes)
 
     # ==== Newton Raphson ==== # 
     
@@ -162,7 +200,20 @@ def main():
     
     # ==== Display ==== #
 
-    plot_disps(np_n, np_e, root, n_ele, PHI)
+    vtk_e = np.copy(np_e)
+    vtk_e[:, -2] = np_e[:, -1]
+    vtk_e[:, -1] = np_e[:, -2] 
+    vtk_e -= 1
+
+    # Convert result to vtk
+    meshio.write_points_cells(
+        "output_mesh.vtk", 
+        np_n[:, 1:], 
+        [("tetra10", vtk_e)] + [("tetra10", vtk_e)], 
+        {"deformed": root.reshape(len(np_n), DIM) + np_n[:, 1:]}
+    )
+
+    # plot_disps(np_n, np_e, root, n_ele, PHI)
 
 if __name__ == '__main__':
     mp.freeze_support()

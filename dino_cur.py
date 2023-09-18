@@ -100,98 +100,51 @@ TMAP = {
 
 #     return u, nodes
 
-def dirichlet_MINMAX(np_n, nodes, u):
+def dirichlet(np_n, bcs):
+    # Initialize arrays to store displacement values and node numbers with BCs
+    u = np.zeros((np_n.shape[0], np_n.shape[1] - 1))
+    nodes = []
 
-    # Notation: 
-    # AminB = Change in B coordinate at min A
-    # XminX = 0
-    # XminY = 0
-    # XminZ = 0
-    # YminX = 0
-    # YminY = 0
-    # YminZ = 0
-    ZminX = 0
-    ZminY = 0
-    ZminZ = 0
-    # CmaxD = Change in D coordinate at max C
-    # XmaxX = 0
-    # XmaxY = 0
-    # XmaxZ = 0
-    # YmaxX = 0
-    # YmaxY = 0
-    # YmaxZ = 0
-    ZmaxX = 0
-    ZmaxY = 0
-    ZmaxZ = -5
-    # cenEF = Change in values at centre of both E and F
-    cenXY = 0
-    # cenYZ = 0
-    # cenZX = 0
+    # Define a helper function to apply BCs and track BC nodes
+    def apply_bc(condition, bc_values, dim_idx):
+        nonlocal nodes
+        nonlocal u
+        u[condition, dim_idx] = bc_values
+        nodes.extend(np.where(condition)[0] * DIM + dim_idx)
 
-    # ==== Apply BCs ==== #
-    for n in np_n[:, 0]:
-        n_val = np_n[np_n[:, 0] == n, 1][0]
+    # Apply BCs
+    for idx, dim in enumerate(['X']):
 
-        # Min X
-        # if n_val == np.amin(np_n[:, 1]):
-        #     u[DIM*(int(n)-1)+0] = XminX
-        #     nodes.append(DIM*(int(n)-1)+0)
-        #     u[DIM*(int(n)-1)+1] = XminY
-        #     nodes.append(DIM*(int(n)-1)+1)
-        #     u[DIM*(int(n)-1)+2] = XminZ
-        #     nodes.append(DIM*(int(n)-1)+2)
-        # Max X
-        # elif n_val == np.amax(np_n[:, 1]):
-        #     u[DIM*(int(n)-1)+0] = XmaxX
-        #     nodes.append(DIM*(int(n)-1)+0)
-        #     u[DIM*(int(n)-1)+1] = XmaxY
-        #     nodes.append(DIM*(int(n)-1)+1)
-        #     u[DIM*(int(n)-1)+2] = XmaxZ
-        #     nodes.append(DIM*(int(n)-1)+2)
+        min_bc = bcs['min'][dim]
+        max_bc = bcs['max'][dim]
+        condition_min = np_n[:, idx + 1] == np.min(np_n[:, idx + 1])
+        condition_max = np_n[:, idx + 1] == np.max(np_n[:, idx + 1])
 
-        # Min Y
-        # if n_val == np.amin(np_n[:, 2]):
-        #     u[DIM*(int(n)-1)+0] = YminX
-        #     nodes.append(DIM*(int(n)-1)+0)
-        #     u[DIM*(int(n)-1)+1] = YminY
-        #     nodes.append(DIM*(int(n)-1)+1)
-        #     u[DIM*(int(n)-1)+2] = YminZ
-        #     nodes.append(DIM*(int(n)-1)+2)
-        # Max Y
-        # elif n_val == np.amax(np_n[:, 2]):
-        #     u[DIM*(int(n)-1)+0] = YmaxX
-        #     nodes.append(DIM*(int(n)-1)+0)
-        #     u[DIM*(int(n)-1)+1] = YmaxY
-        #     nodes.append(DIM*(int(n)-1)+1)
-        #     u[DIM*(int(n)-1)+2] = YmaxZ
-        #     nodes.append(DIM*(int(n)-1)+2)
+        for dim_idx in range(0, 3, 1):
+            apply_bc(condition_min, min_bc[dim_idx], dim_idx)
+            apply_bc(condition_max, max_bc[dim_idx], dim_idx)
 
-        # Min Z
-        if n_val == np.amin(np_n[:, 3]):
-            u[DIM*(int(n)-1)+0] = ZminX
-            nodes.append(DIM*(int(n)-1)+0)
-            u[DIM*(int(n)-1)+1] = ZminY
-            nodes.append(DIM*(int(n)-1)+1)
-            u[DIM*(int(n)-1)+2] = ZminZ
-            nodes.append(DIM*(int(n)-1)+2)
-        # Max Z
-        elif n_val == np.amax(np_n[:, 3]):
-            u[DIM*(int(n)-1)+0] = ZmaxX
-            nodes.append(DIM*(int(n)-1)+0)
-            u[DIM*(int(n)-1)+1] = ZmaxY
-            nodes.append(DIM*(int(n)-1)+1)
-            u[DIM*(int(n)-1)+2] = ZmaxZ
-            nodes.append(DIM*(int(n)-1)+2)
+    # # Apply BCs at the center of X, Y, and Z
+    # center_bc = bcs['center']
+    # for dim_idx, bc_value in enumerate(center_bc):
+    #     condition = np_n[:, dim_idx + 1] == bc_value
+    #     apply_bc(condition, bc_value, dim_idx)
 
-        # X centreline
-        if abs(n_val - (np.amin(np_n[:, 0]) + np.amax(np_n[:, 0]))/2) < 0.05*np.amax(np_n[:, 0]) and \
-            abs(n_val - (np.amin(np_n[:, 1]) + np.amax(np_n[:, 1]))/2) < 0.05*np.amax(np_n[:, 1]):
-            u[DIM*(int(n)-1)+0] = cenXY
-            nodes.append(DIM*(int(n)-1)+0)
-            u[DIM*(int(n)-1)+1] = cenXY
-            nodes.append(DIM*(int(n)-1)+1)
+    # Remove duplicates from the list of BC nodes
+    nodes = list(set(nodes))
 
-    return u, nodes
+    for row, xyz in enumerate(u):
+        if np.isnan(xyz[0]):
+            nodes.remove(row*DIM + 0)
+        if np.isnan(xyz[1]):
+            nodes.remove(row*DIM + 1)
+        if np.isnan(xyz[2]):
+            nodes.remove(row*DIM + 2)
+
+    u = u.flatten()
+    u[np.isnan(u)] = 0
+
+    return u, np.array(nodes)
 
 def nodes_and_elements(file_name, type_num):
 
@@ -589,7 +542,7 @@ def newton_raph(u, nodes, np_n, np_e, n_ele, dN, c_vals, num_pro, iters, tol):
         # else:
         #     un = sp.linalg.solve(nrKT_sol, nrF)
 
-        if nodes != None:
+        if len(nodes) > 0:
             nrF[nodes] = 0
             for idx in nodes:
                 nrKT_sol[idx, :] = 0
@@ -612,8 +565,8 @@ def newton_raph(u, nodes, np_n, np_e, n_ele, dN, c_vals, num_pro, iters, tol):
 
         if SSR < tol or SSU < tol:
             print(nodes)
-            plt.plot(nrF_sol)
-            plt.show()
+            # plt.plot(nrF_sol)
+            # plt.show()
             print(nrF_sol)
             return xn - np_n[:, 1:].flatten(), i
 
