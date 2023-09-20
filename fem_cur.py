@@ -14,7 +14,7 @@ from dino_cur import *
 
 # Global Variables
 DIRECTORY = "GitHub/Dino/"
-FILE_NAME = "simpleAnnulusTest"
+FILE_NAME = "largeSarcTest"
 D_BASECASE = 1
 N_BASECASE = 0
 CONSTITUTIVE_TYPE = 0
@@ -177,7 +177,7 @@ def main():
 
     neu_bc = {
         'val': 0.1,
-        'pos': 0.8
+        'pos': 0.2
     }
 
     if N_BASECASE:

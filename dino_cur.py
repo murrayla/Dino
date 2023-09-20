@@ -151,12 +151,12 @@ def neumann(np_n, bcs):
     nodes = list()
 
     for i, (x, y, z) in enumerate(np_n[:, 1:]):
-        if abs(np.linalg.norm([x, y, z]) - bcs['pos']) < 1e-3:
-            rhs[DIM*i + 0] = bcs['val']
-            rhs[DIM*i + 1] = bcs['val']
-            rhs[DIM*i + 2] = bcs['val']
-
-        nodes.extend([DIM * i + 0, DIM * i + 1, DIM * i + 2])
+        vecNorm = np.linalg.norm([x, y, z])
+        if abs(vecNorm - bcs['pos']) < 1e-2 and abs(z) < 1:
+            rhs[DIM*i + 0] = x / vecNorm * bcs['val']
+            rhs[DIM*i + 1] = y / vecNorm * bcs['val']
+            rhs[DIM*i + 2] = z / vecNorm * bcs['val'] 
+            nodes.extend([DIM * i + 0, DIM * i + 1, DIM * i + 2])
 
     return rhs, np.array(nodes)
 
@@ -540,45 +540,46 @@ def newton_raph(u, dir_n, rhs, neu_n, np_n, np_e, n_ele, dN, c_vals, num_pro, it
     # ============================== #
 
     xn = np_n[:, 1:].flatten() + u 
-    for i in range(0, iters, 1):
-        nrF, nrKT = nonlinear_solve(xn, np_n, np_e, dN, c_vals, n_ele, num_pro)
+    return u, 1
+    # for i in range(0, iters, 1):
+    #     nrF, nrKT = nonlinear_solve(xn, np_n, np_e, dN, c_vals, n_ele, num_pro)
 
-        nrKT_sol = np.copy(nrKT)
-        nrF_sol = np.copy(nrF)
+    #     nrKT_sol = np.copy(nrKT)
+    #     nrF_sol = np.copy(nrF)
 
-        if i == 0:
-            nrF[neu_n] = rhs[neu_n]
+    #     if i == 0:
+    #         nrF[neu_n] = rhs[neu_n]
 
-        if len(dir_n) > 0:
-            nrF[dir_n] = 0
-            for idx in dir_n:
-                nrKT_sol[idx, :] = 0
-                nrKT_sol[:, idx] = 0
-                nrKT_sol[idx, idx] = nrKT[idx, idx]
-            un = sp.linalg.solve(nrKT_sol, nrF)
-        else:
-            un = sp.linalg.solve(nrKT_sol, nrF)
+    #     if len(dir_n) > 0:
+    #         nrF[dir_n] = 0
+    #         for idx in dir_n:
+    #             nrKT_sol[idx, :] = 0
+    #             nrKT_sol[:, idx] = 0
+    #             nrKT_sol[idx, idx] = nrKT[idx, idx]
+    #         un = sp.linalg.solve(nrKT_sol, nrF)
+    #     else:
+    #         un = sp.linalg.solve(nrKT_sol, nrF)
 
-        xn1 = xn + un
+    #     xn1 = xn + un
 
-        SSR = sum(np.square(nrF))
-        SSU = sum(np.square(un))
+    #     SSR = sum(np.square(nrF))
+    #     SSU = sum(np.square(un))
         
-        xn = xn1
+    #     xn = xn1
 
-        print("Sum of Squared (RESIDUAL): {}".format(SSR))
-        print("Sum of Squared (DELTA): {}".format(SSU))
-        print("Iteration Number: {}".format(i))
+    #     print("Sum of Squared (RESIDUAL): {}".format(SSR))
+    #     print("Sum of Squared (DELTA): {}".format(SSU))
+    #     print("Iteration Number: {}".format(i))
 
-        if SSR < tol or SSU < tol:
-            print(dir_n)
-            # plt.plot(nrF_sol)
-            # plt.show()
-            print(nrF_sol)
-            return xn - np_n[:, 1:].flatten(), i
+    #     if SSR < tol: # or SSU < tol:
+    #         print(dir_n)
+    #         # plt.plot(nrF_sol)
+    #         # plt.show()
+    #         print(nrF_sol)
+    #         return xn - np_n[:, 1:].flatten(), i
 
-    print("Did not converge")
-    return xn - np_n[:, 1:].flatten(), iters
+    # print("Did not converge")
+    # return xn - np_n[:, 1:].flatten(), iters
 
 def plot_disps(np_n, np_e, u, n_ele, phi):
     plt.plot(u)
