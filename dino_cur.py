@@ -67,39 +67,6 @@ TMAP = {
         (2,1): 4, (2,0): 5, (0,2): 5
 }
 
-# def dirichlet_MINMAX(np_n, u, nodes, BC0, BC1, axi):
-
-#     # ============================== #
-#     # Apply Boundary Conditions
-#     # ============================== #
-
-#     for n in np_n[:, 0]:
-#         n_val = np_n[np_n[:, 0] == n, axi+1][0]
-
-#         if n_val == np.amin(np_n[:, axi+1]):
-#             if BC0[0] is not None and (DIM*(int(n)-1)+0) not in nodes:
-#                 u[DIM*(int(n)-1)+0] = BC0[0]
-#                 nodes.append(DIM*(int(n)-1)+0)
-#             if BC0[1] is not None and (DIM*(int(n)-1)+1) not in nodes:
-#                 u[DIM*(int(n)-1)+1] = BC0[1]
-#                 nodes.append(DIM*(int(n)-1)+1)
-#             if BC0[2] is not None and (DIM*(int(n)-1)+2) not in nodes:
-#                 u[DIM*(int(n)-1)+2] = BC0[2]
-#                 nodes.append(DIM*(int(n)-1)+2)
-
-#         elif n_val == np.amax(np_n[:, axi+1]):
-#             if BC1[0] is not None and (DIM*(int(n)-1)+0) not in nodes:
-#                 u[DIM*(int(n)-1)+0] = BC1[0]
-#                 nodes.append(DIM*(int(n)-1)+0)
-#             if BC1[1] is not None and (DIM*(int(n)-1)+1) not in nodes:
-#                 u[DIM*(int(n)-1)+1] = BC1[1]
-#                 nodes.append(DIM*(int(n)-1)+1)
-#             if BC1[2] is not None and (DIM*(int(n)-1)+2) not in nodes:
-#                 u[DIM*(int(n)-1)+2] = BC1[2]
-#                 nodes.append(DIM*(int(n)-1)+2)
-
-#     return u, nodes
-
 def dirichlet(np_n, bcs):
     # Initialize arrays to store displacement values and node numbers with BCs
     u = np.zeros((np_n.shape[0], np_n.shape[1] - 1))
@@ -113,16 +80,23 @@ def dirichlet(np_n, bcs):
         nodes.extend(np.where(condition)[0] * DIM + dim_idx)
 
     # Apply BCs
-    for idx, dim in enumerate(['X']):
+    for idx, axi in enumerate(['X', 'Y', 'Z']):
 
-        min_bc = bcs['min'][dim]
-        max_bc = bcs['max'][dim]
+        min_bc = bcs['min'][axi]
+        max_bc = bcs['max'][axi]
+
         condition_min = np_n[:, idx + 1] == np.min(np_n[:, idx + 1])
         condition_max = np_n[:, idx + 1] == np.max(np_n[:, idx + 1])
 
-        for dim_idx in range(0, 3, 1):
-            apply_bc(condition_min, min_bc[dim_idx], dim_idx)
-            apply_bc(condition_max, max_bc[dim_idx], dim_idx)
+        for dim_idx in range(0, DIM, 1):
+
+            if min_bc[dim_idx] is not None:
+                u[condition_min, dim_idx] = min_bc[dim_idx]
+                nodes.extend(np.where(condition_min)[0] * DIM + dim_idx)
+
+            if max_bc[dim_idx] is not None:
+                u[condition_max, dim_idx] = max_bc[dim_idx]
+                nodes.extend(np.where(condition_max)[0] * DIM + dim_idx)
 
     # # Apply BCs at the center of X, Y, and Z
     # center_bc = bcs['center']
@@ -130,35 +104,33 @@ def dirichlet(np_n, bcs):
     #     condition = np_n[:, dim_idx + 1] == bc_value
     #     apply_bc(condition, bc_value, dim_idx)
 
-    # Remove duplicates from the list of BC nodes
-    nodes = list(set(nodes))
+    # # Remove duplicates from the list of BC nodes
+    # nodes = list(set(nodes))
 
-    for row, xyz in enumerate(u):
-        if np.isnan(xyz[0]):
-            nodes.remove(row*DIM + 0)
-        if np.isnan(xyz[1]):
-            nodes.remove(row*DIM + 1)
-        if np.isnan(xyz[2]):
-            nodes.remove(row*DIM + 2)
+    # for row, xyz in enumerate(u):
+    #     if np.isnan(xyz[0]):
+    #         nodes.remove(row*DIM + 0)
+    #     if np.isnan(xyz[1]):
+    #         nodes.remove(row*DIM + 1)
+    #     if np.isnan(xyz[2]):
+    #         nodes.remove(row*DIM + 2)
 
     u = u.flatten()
-    u[np.isnan(u)] = 0
+    # u[np.isnan(u)] = 0
 
     return u, np.array(nodes)
 
 def neumann(np_n, bcs):
     rhs = np.zeros((np_n.shape[0], np_n.shape[1] - 1)).flatten()
-    nodes = list()
 
     for i, (x, y, z) in enumerate(np_n[:, 1:]):
-        vecNorm = np.linalg.norm([x, y, z])
-        if abs(vecNorm - bcs['pos']) < 1e-2 and abs(z) < 1:
+        # if x == 100:
+        #     rhs[DIM*i] = 0.1
+        vecNorm = np.linalg.norm([x, y])
+        if abs(vecNorm - bcs['pos']) < 1e-3 and abs(z - 1) < 1e-3:
             rhs[DIM*i + 0] = x / vecNorm * bcs['val']
             rhs[DIM*i + 1] = y / vecNorm * bcs['val']
-            rhs[DIM*i + 2] = z / vecNorm * bcs['val'] 
-            nodes.extend([DIM * i + 0, DIM * i + 1, DIM * i + 2])
-
-    return rhs, np.array(nodes)
+    return rhs
 
 def nodes_and_elements(file_name, type_num):
 
@@ -533,53 +505,53 @@ def nonlinear_solve(x, np_n, np_e, dN, c_vals, n_ele, num_pro):
 
     return sum(Fsol_Results), sum(Ftan_Results)
 
-def newton_raph(u, dir_n, rhs, neu_n, np_n, np_e, n_ele, dN, c_vals, num_pro, iters, tol):
+def newton_raph(u, dir_n, f, np_n, np_e, n_ele, dN, c_vals, num_pro, iters, tol):
 
     # ============================== #
     # Newton Raphson Solver
     # ============================== #
 
     xn = np_n[:, 1:].flatten() + u 
-    return u, 1
-    # for i in range(0, iters, 1):
-    #     nrF, nrKT = nonlinear_solve(xn, np_n, np_e, dN, c_vals, n_ele, num_pro)
+    # return u, 1
+    for i in range(0, iters, 1):
+        nrF, nrKT = nonlinear_solve(xn, np_n, np_e, dN, c_vals, n_ele, num_pro)
 
-    #     nrKT_sol = np.copy(nrKT)
-    #     nrF_sol = np.copy(nrF)
+        rhs = f - nrF
 
-    #     if i == 0:
-    #         nrF[neu_n] = rhs[neu_n]
+        nrKT_sol = np.copy(nrKT)
+        rhs_sol = np.copy(rhs)
 
-    #     if len(dir_n) > 0:
-    #         nrF[dir_n] = 0
-    #         for idx in dir_n:
-    #             nrKT_sol[idx, :] = 0
-    #             nrKT_sol[:, idx] = 0
-    #             nrKT_sol[idx, idx] = nrKT[idx, idx]
-    #         un = sp.linalg.solve(nrKT_sol, nrF)
-    #     else:
-    #         un = sp.linalg.solve(nrKT_sol, nrF)
+        if len(dir_n) > 0:
+            rhs[dir_n] = 0
+            for idx in dir_n:
+                nrKT_sol[idx, :] = 0
+                nrKT_sol[:, idx] = 0
+                nrKT_sol[idx, idx] = nrKT[idx, idx]
+            un = sp.linalg.solve(nrKT_sol, rhs)
+        else:
+            un = sp.linalg.solve(nrKT_sol, rhs)
 
-    #     xn1 = xn + un
+        xn1 = xn - un
 
-    #     SSR = sum(np.square(nrF))
-    #     SSU = sum(np.square(un))
+        SSR = sum(np.square(rhs))
+        SSU = sum(np.square(un))
         
-    #     xn = xn1
+        xn = xn1
 
-    #     print("Sum of Squared (RESIDUAL): {}".format(SSR))
-    #     print("Sum of Squared (DELTA): {}".format(SSU))
-    #     print("Iteration Number: {}".format(i))
+        print("Sum of Squared (RESIDUAL): {}".format(SSR))
+        print("Sum of Squared (DELTA): {}".format(SSU))
+        print("Iteration Number: {}".format(i))
 
-    #     if SSR < tol: # or SSU < tol:
-    #         print(dir_n)
-    #         # plt.plot(nrF_sol)
-    #         # plt.show()
-    #         print(nrF_sol)
-    #         return xn - np_n[:, 1:].flatten(), i
+        if SSR < tol: # or SSU < tol:
+            # plt.plot(rhs_sol)
+            # plt.show()
+            np.savetxt('testCubeForce_2.txt', rhs_sol)
+            np.savetxt('testCubeDispl_2.txt', xn)
+            np.savetxt('testCubeNodes_2.txt', dir_n)
+            return xn - np_n[:, 1:].flatten(), i
 
-    # print("Did not converge")
-    # return xn - np_n[:, 1:].flatten(), iters
+    print("Did not converge")
+    return xn - np_n[:, 1:].flatten(), iters
 
 def plot_disps(np_n, np_e, u, n_ele, phi):
     plt.plot(u)

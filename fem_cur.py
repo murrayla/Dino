@@ -14,11 +14,11 @@ from dino_cur import *
 
 # Global Variables
 DIRECTORY = "GitHub/Dino/"
-FILE_NAME = "largeSarcTest"
-D_BASECASE = 1
-N_BASECASE = 0
+FILE_NAME = "cubeTest"
+D_BASECASE = True
+N_BASECASE = False
 CONSTITUTIVE_TYPE = 0
-C_VALS = [1, 1] #0.092,0.237]
+C_VALS = [1, 1] 
 E_MOD = 200 
 NU = 0.20
 NUM_PROCESSES = 4
@@ -153,13 +153,13 @@ def main():
         'min': {
             # [X @ min X, Y @ min X, Z @ min X]
             'X': [0, 0, 0],
-            'Y': [None, 0, None],
+            'Y': [None, None, None],
             'Z': [None, None, None]
         },
         'max': {
             # [X @ max X, Y @ max X, Z @ max X]
-            'X': [20, 0, 0],
-            'Y': [None, 0, None],
+            'X': [10, 0, 0],
+            'Y': [None, None, None],
             'Z': [None, None, None]
         },
         'center': {
@@ -176,20 +176,24 @@ def main():
         u, dir_n = dirichlet(np_n, dir_bc)
 
     neu_bc = {
-        'val': 0.1,
-        'pos': 0.2
+        'val': 1000,
+        'pos': 0.8
     }
 
     if N_BASECASE:
-        neu_n = list()
+        f = np.zeros(n_n*dim)
     else:
-        rhs, neu_n = neumann(np_n, neu_bc)
+        f = np.zeros(n_n*dim)
+        f_vals = np.loadtxt('testCubeForce_1.txt', dtype=float)
+        f_node = np.loadtxt('testCubeNodes_1.txt', dtype=float).astype(int)
+        for i in f_node:
+            f[i] = f_vals[i]
+        #f = neumann(np_n, neu_bc)
 
-    print(rhs)
 
     # ==== Newton Raphson ==== # 
     
-    root, it = newton_raph(u, dir_n, rhs, neu_n, np_n, np_e, n_ele, DEL_PHI, C_VALS, NUM_PROCESSES, ITERATIONS, TOLERANCE)
+    root, it = newton_raph(u, dir_n, f, np_n, np_e, n_ele, DEL_PHI, C_VALS, NUM_PROCESSES, ITERATIONS, TOLERANCE)
     print("After {} iterations we have:".format(it))
     print(root)
     
