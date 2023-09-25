@@ -13,17 +13,17 @@ import meshio
 from dino_cur import *
 
 # Global Variables
-DIRECTORY = "Dino/"
-FILE_NAME = "simpleAnnulusTest"
+DIRECTORY = ""
+FILE_NAME = "nashAnnulus"
 D_BASECASE = False
 N_BASECASE = True
 CONSTITUTIVE_TYPE = 0
-C_VALS = [1, 1] 
+C_VALS = [2, 6] 
 E_MOD = 200 
 NU = 0.20
 NUM_PROCESSES = 4
 ITERATIONS = 100
-TOLERANCE = 1e-6
+TOLERANCE = 1e-4
 GP = np.array(
     [
         [1/4, 1/4, 1/4], 
@@ -83,7 +83,7 @@ def main():
     # ==== Setup ==== #
 
     # Intake Mesh
-    nodes_and_elements(DIRECTORY + "gmsh_" + FILE_NAME + ".msh", type_num=11)
+    nodes_and_elements(DIRECTORY + "test_msh/" + "gmsh_" + FILE_NAME + ".msh", type_num=11)
     nodes = open(DIRECTORY + "runtime_files/" + FILE_NAME + "_cvt2dino.nodes", 'r')
     elems = open(DIRECTORY + "runtime_files/" + FILE_NAME + "_cvt2dino.ele", 'r')
     n_list = list()
@@ -119,7 +119,7 @@ def main():
             # [X @ max X, Y @ max X, Z @ max X]
             'X': [None, None, None],
             'Y': [None, None, None],
-            'Z': [0, 0, 0]
+            'Z': [0, 0, 0.02]
         },
         'center': {
             # [X @ centre X, Y @ centre X, Z @ centre X]

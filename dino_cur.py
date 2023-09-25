@@ -1,5 +1,6 @@
 import numpy as np
 import scipy as sp
+import math
 import multiprocessing as mp
 import matplotlib.pyplot as plt
 from matplotlib.cm import get_cmap
@@ -27,17 +28,22 @@ TMAP = {
         (2,1): 4, (2,0): 5, (0,2): 5
 }
 
+
+def rotate_coordinates(x, y, z, angle_degrees):
+    # Convert the angle from degrees to radians
+    angle_radians = math.radians(angle_degrees)
+
+    # Perform the rotation about the z-axis using trigonometric functions
+    new_x = x * math.cos(angle_radians) - y * math.sin(angle_radians)
+    new_y = x * math.sin(angle_radians) + y * math.cos(angle_radians)
+    new_z = z
+
+    return new_x, new_y, new_z
+
 def dirichlet(np_n, bcs):
     # Initialize arrays to store displacement values and node numbers with BCs
     u = np.zeros((np_n.shape[0], np_n.shape[1] - 1))
     nodes = []
-
-    # Define a helper function to apply BCs and track BC nodes
-    def apply_bc(condition, bc_values, dim_idx):
-        nonlocal nodes
-        nonlocal u
-        u[condition, dim_idx] = bc_values
-        nodes.extend(np.where(condition)[0] * DIM + dim_idx)
 
     # Apply BCs
     for idx, axi in enumerate(['X', 'Y', 'Z']):
@@ -59,6 +65,14 @@ def dirichlet(np_n, bcs):
                 nodes.extend(np.where(condition_min)[0] * DIM + dim_idx)
 
             if max_bc[dim_idx] is not None:
+                # if dim_idx == 0 or dim_idx == 1:
+                #     # u[condition_max, dim_idx] = max_bc[dim_idx]
+                #     # Rotate the coordinates if there's a max_bc
+                #     rotated_coords = rotate_coordinates(np_n[condition_max, 1], np_n[condition_max, 2], np_n[condition_max, 3], 30)
+                #     u[condition_max, 1] = rotated_coords[0] - np_n[condition_max, 1]
+                #     u[condition_max, 2] = rotated_coords[1] - np_n[condition_max, 2]
+                # else:
+                #     u[condition_max, dim_idx] = max_bc[dim_idx]
                 u[condition_max, dim_idx] = max_bc[dim_idx]
                 nodes.extend(np.where(condition_max)[0] * DIM + dim_idx)
 
@@ -69,16 +83,16 @@ def dirichlet(np_n, bcs):
     # Apply centre BCs
 
      # Apply BCs
-    for idx, axi in enumerate(['X', 'Y', 'Z']):
+    # for idx, axi in enumerate(['X', 'Y', 'Z']):
 
-        if axi == 'Z':
-            # cen_bc = bcs['center']['Z']
-            for idx in np.where((np_n[:, 3] >= 0.9) & (np_n[:, 3] <= 1.1))[0]:
-                vecNorm = np.linalg.norm([np_n[idx, 1], np_n[idx, 2]])
-                if abs(vecNorm - 0.8) < 1e-3:
-                    u[idx, 0] = np_n[idx, 1] / vecNorm * 0.02
-                    u[idx, 1] = np_n[idx, 2] / vecNorm * 0.02
-                    nodes.extend([DIM * idx + 0, DIM * idx + 1])
+    #     if axi == 'Z':
+    #         # cen_bc = bcs['center']['Z']
+    #         for idx in np.where((np_n[:, 3] >= 0.9) & (np_n[:, 3] <= 1.1))[0]:
+    #             vecNorm = np.linalg.norm([np_n[idx, 1], np_n[idx, 2]])
+    #             if abs(vecNorm - 0.8) < 1e-3:
+    #                 u[idx, 0] = np_n[idx, 1] / vecNorm * 0.02
+    #                 u[idx, 1] = np_n[idx, 2] / vecNorm * 0.02
+    #                 nodes.extend([DIM * idx + 0, DIM * idx + 1])
 
         # for dim_idx in range(0, DIM, 1):
 
@@ -148,7 +162,7 @@ def nodes_and_elements(file_name, type_num):
 
     # Nodes 
     # Create a file to write to: gmsh2iron.node
-    save_name = 'Dino/runtime_files/' + file_name.split('gmsh_')[1].split('.msh')[0]
+    save_name = 'runtime_files/' + file_name.split('gmsh_')[1].split('.msh')[0]
     node_file = open(save_name + '_cvt2dino.nodes', 'w')
     node_file.write(nodes_list[0] + "\n")
     # Loop through nodes and blocks
@@ -286,7 +300,7 @@ def constitutive_eqs(e, c_vals, np_n, np_e, x, dN):
     # ============================== #
 
     # Nearly incompressible
-    d = 1000.1**-1
+    d_val = 1**-1
     Em   = 200 
     nu  = 0.20
     mu  = Em/(2*(1+nu))
@@ -304,8 +318,8 @@ def constitutive_eqs(e, c_vals, np_n, np_e, x, dN):
         ## ==== Mooney Rivlin ==== #
         # # W(I1, I2, J) = c1 * (I1 - 3) + c2 * (I2 - 3) + 1/d * (J - 1)^2
         # # Derivatives of Energy in terms of Invariants
-        # dWdI = np.array([c_vals[0], c_vals[1], 2/d*(fdet[n]-1)])
-        # ddWdII = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 2/d]])
+        # dWdI = np.array([c_vals[0], c_vals[1], 0])
+        # ddWdII = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]])
 
         ## ==== neo-Hookean ==== #
         # W = 0.5 * mu * (I1 - 3 - 2 * ln(J)) + 0.5 * lambda * (J - 1)^2
