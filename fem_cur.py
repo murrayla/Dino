@@ -14,13 +14,14 @@ from dino_cur import *
 
 # Global Variables
 DIRECTORY = ""
-FILE_NAME = "nashAnnulus"
+FILE_NAME = "cubeTest"
 D_BASECASE = False
 N_BASECASE = True
 CONSTITUTIVE_TYPE = 0
 C_VALS = [2, 6] 
 E_MOD = 200 
 NU = 0.20
+LOADSTEPS = 10
 NUM_PROCESSES = 4
 ITERATIONS = 100
 TOLERANCE = 1e-4
@@ -106,7 +107,6 @@ def main():
 
     # Preallocate
     dim = 3
-    u = np.zeros(n_n*dim)
 
     dir_bc = {
         'min': {
@@ -119,7 +119,7 @@ def main():
             # [X @ max X, Y @ max X, Z @ max X]
             'X': [None, None, None],
             'Y': [None, None, None],
-            'Z': [0, 0, 0.02]
+            'Z': [0, 0, 10]
         },
         'center': {
             # [X @ centre X, Y @ centre X, Z @ centre X]
@@ -131,6 +131,7 @@ def main():
 
     if D_BASECASE:
         dir_n = list()
+        u = np.zeros(n_n*dim)
     else:
         u, dir_n = dirichlet(np_n, dir_bc)
 
@@ -155,10 +156,22 @@ def main():
 
     # ==== Newton Raphson ==== # 
     
-    root, it = newton_raph(u, dir_n, f, np_n, np_e, n_ele, DEL_PHI, C_VALS, NUM_PROCESSES, ITERATIONS, TOLERANCE)
+    if LOADSTEPS:
+        root_T = np.zeros(n_n*dim)
+        root = np.zeros(n_n*dim)
+        np_n_step = np.copy(np_n)
+        u_step = u / LOADSTEPS
+        for i in range(0, LOADSTEPS, 1):
+            np_n_step[:, 1:] += root.reshape(len(np_n), DIM)
+            root, it = newton_raph(u_step, dir_n, f, np_n_step, np_e, n_ele, DEL_PHI, C_VALS, NUM_PROCESSES, ITERATIONS, TOLERANCE)
+            root_T += root
+    else:
+        root, it = newton_raph(u, dir_n, f, np_n, np_e, n_ele, DEL_PHI, C_VALS, NUM_PROCESSES, ITERATIONS, TOLERANCE)
+        root_T = root
+
     print("After {} iterations we have:".format(it))
     print(root)
-    
+        
     # ==== Display ==== #
 
     vtk_e = np.copy(np_e)
@@ -171,7 +184,7 @@ def main():
         FILE_NAME + ".vtk", 
         np_n[:, 1:], 
         [("tetra10", vtk_e)] + [("tetra10", vtk_e)], 
-        {"deformed": root.reshape(len(np_n), DIM) + np_n[:, 1:]}
+        {"deformed": root_T.reshape(len(np_n), DIM) + np_n[:, 1:]}
     )
 
     # plot_disps(np_n, np_e, root, n_ele, PHI)
