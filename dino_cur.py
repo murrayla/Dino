@@ -5,46 +5,6 @@ import matplotlib.pyplot as plt
 from matplotlib.cm import get_cmap
 from functools import partial
 
-# data = [
-#     [0.9197896733368800, 0.0267367755543735, 0.0267367755543735, 0.0021900463965388],
-#     [0.0267367755543735, 0.9197896733368800, 0.0267367755543735, 0.0021900463965388],
-#     [0.0267367755543735, 0.0267367755543735, 0.9197896733368800, 0.0021900463965388],
-#     [0.0267367755543735, 0.0267367755543735, 0.0267367755543735, 0.0021900463965388],
-#     [0.1740356302468940, 0.7477598884818090, 0.0391022406356488, 0.0143395670177665],
-#     [0.7477598884818090, 0.1740356302468940, 0.0391022406356488, 0.0143395670177665],
-#     [0.1740356302468940, 0.0391022406356488, 0.7477598884818090, 0.0143395670177665],
-#     [0.7477598884818090, 0.0391022406356488, 0.1740356302468940, 0.0143395670177665],
-#     [0.1740356302468940, 0.0391022406356488, 0.0391022406356488, 0.0143395670177665],
-#     [0.7477598884818090, 0.0391022406356488, 0.0391022406356488, 0.0143395670177665],
-#     [0.0391022406356488, 0.1740356302468940, 0.7477598884818090, 0.0143395670177665],
-#     [0.0391022406356488, 0.7477598884818090, 0.1740356302468940, 0.0143395670177665],
-#     [0.0391022406356488, 0.1740356302468940, 0.0391022406356488, 0.0143395670177665],
-#     [0.0391022406356488, 0.7477598884818090, 0.0391022406356488, 0.0143395670177665],
-#     [0.0391022406356488, 0.0391022406356488, 0.1740356302468940, 0.0143395670177665],
-#     [0.0391022406356488, 0.0391022406356488, 0.7477598884818090, 0.0143395670177665],
-#     [0.4547545999844830, 0.4547545999844830, 0.0452454000155172, 0.0250305395686746],
-#     [0.4547545999844830, 0.0452454000155172, 0.4547545999844830, 0.0250305395686746],
-#     [0.4547545999844830, 0.0452454000155172, 0.0452454000155172, 0.0250305395686746],
-#     [0.0452454000155172, 0.4547545999844830, 0.4547545999844830, 0.0250305395686746],
-#     [0.0452454000155172, 0.4547545999844830, 0.0452454000155172, 0.0250305395686746],
-#     [0.0452454000155172, 0.0452454000155172, 0.4547545999844830, 0.0250305395686746],
-#     [0.5031186450145980, 0.2232010379623150, 0.2232010379623150, 0.0479839333057554],
-#     [0.2232010379623150, 0.5031186450145980, 0.2232010379623150, 0.0479839333057554],
-#     [0.2232010379623150, 0.2232010379623150, 0.5031186450145980, 0.0479839333057554],
-#     [0.5031186450145980, 0.2232010379623150, 0.0504792790607720, 0.0479839333057554],
-#     [0.2232010379623150, 0.5031186450145980, 0.0504792790607720, 0.0479839333057554],
-#     [0.2232010379623150, 0.2232010379623150, 0.0504792790607720, 0.0479839333057554],
-#     [0.5031186450145980, 0.0504792790607720, 0.2232010379623150, 0.0479839333057554],
-#     [0.2232010379623150, 0.0504792790607720, 0.5031186450145980, 0.0479839333057554],
-#     [0.2232010379623150, 0.0504792790607720, 0.2232010379623150, 0.0479839333057554],
-#     [0.0504792790607720, 0.5031186450145980, 0.2232010379623150, 0.0479839333057554],
-#     [0.0504792790607720, 0.2232010379623150, 0.5031186450145980, 0.0479839333057554],
-#     [0.0504792790607720, 0.2232010379623150, 0.2232010379623150, 0.0479839333057554],
-#     [0.2500000000000000, 0.2500000000000000, 0.2500000000000000, 0.0931745731195340]
-# ]
-# GP = np.array(data)[:, :3]
-# WE = np.array(data)[:, 3]
-
 WE = np.array([-4/5, 9/20, 9/20, 9/20, 9/20])
 GP = np.array(
     [
@@ -88,6 +48,10 @@ def dirichlet(np_n, bcs):
         condition_min = np_n[:, idx + 1] == np.min(np_n[:, idx + 1])
         condition_max = np_n[:, idx + 1] == np.max(np_n[:, idx + 1])
 
+        # if axi == 'Z':
+        #     condition_cen = np.logical_and(np_n[:, 3] > 0.8, np_n[:,3] < 1.2)
+        #     cen_bc = bcs['center']['Z']
+
         for dim_idx in range(0, DIM, 1):
 
             if min_bc[dim_idx] is not None:
@@ -98,25 +62,31 @@ def dirichlet(np_n, bcs):
                 u[condition_max, dim_idx] = max_bc[dim_idx]
                 nodes.extend(np.where(condition_max)[0] * DIM + dim_idx)
 
-    # # Apply BCs at the center of X, Y, and Z
-    # center_bc = bcs['center']
-    # for dim_idx, bc_value in enumerate(center_bc):
-    #     condition = np_n[:, dim_idx + 1] == bc_value
-    #     apply_bc(condition, bc_value, dim_idx)
+            # if axi == 'Z' and cen_bc[dim_idx] is not None:
+            #     u[condition_min, dim_idx] = cen_bc[dim_idx]
+            #     nodes.extend(np.where(condition_min)[0] * DIM + dim_idx)
 
-    # # Remove duplicates from the list of BC nodes
-    # nodes = list(set(nodes))
+    # Apply centre BCs
 
-    # for row, xyz in enumerate(u):
-    #     if np.isnan(xyz[0]):
-    #         nodes.remove(row*DIM + 0)
-    #     if np.isnan(xyz[1]):
-    #         nodes.remove(row*DIM + 1)
-    #     if np.isnan(xyz[2]):
-    #         nodes.remove(row*DIM + 2)
+     # Apply BCs
+    for idx, axi in enumerate(['X', 'Y', 'Z']):
+
+        if axi == 'Z':
+            # cen_bc = bcs['center']['Z']
+            for idx in np.where((np_n[:, 3] >= 0.9) & (np_n[:, 3] <= 1.1))[0]:
+                vecNorm = np.linalg.norm([np_n[idx, 1], np_n[idx, 2]])
+                if abs(vecNorm - 0.8) < 1e-3:
+                    u[idx, 0] = np_n[idx, 1] / vecNorm * 0.02
+                    u[idx, 1] = np_n[idx, 2] / vecNorm * 0.02
+                    nodes.extend([DIM * idx + 0, DIM * idx + 1])
+
+        # for dim_idx in range(0, DIM, 1):
+
+        #     if axi == 'Z' and cen_bc[dim_idx] is not None:
+        #         u[condition_min, dim_idx] = cen_bc[dim_idx]
+        #         nodes.extend(np.where(condition_min)[0] * DIM + dim_idx)
 
     u = u.flatten()
-    # u[np.isnan(u)] = 0
 
     return u, np.array(nodes)
 
@@ -178,7 +148,7 @@ def nodes_and_elements(file_name, type_num):
 
     # Nodes 
     # Create a file to write to: gmsh2iron.node
-    save_name = 'GitHub/Dino/' + file_name.split('gmsh_')[1].split('.msh')[0]
+    save_name = 'Dino/runtime_files/' + file_name.split('gmsh_')[1].split('.msh')[0]
     node_file = open(save_name + '_cvt2dino.nodes', 'w')
     node_file.write(nodes_list[0] + "\n")
     # Loop through nodes and blocks
@@ -545,9 +515,9 @@ def newton_raph(u, dir_n, f, np_n, np_e, n_ele, dN, c_vals, num_pro, iters, tol)
         if SSR < tol: # or SSU < tol:
             # plt.plot(rhs_sol)
             # plt.show()
-            np.savetxt('testCubeForce_2.txt', rhs_sol)
-            np.savetxt('testCubeDispl_2.txt', xn)
-            np.savetxt('testCubeNodes_2.txt', dir_n)
+            # np.savetxt('testCubeForce_2.txt', rhs_sol)
+            # np.savetxt('testCubeDispl_2.txt', xn)
+            # np.savetxt('testCubeNodes_2.txt', dir_n)
             return xn - np_n[:, 1:].flatten(), i
 
     print("Did not converge")
