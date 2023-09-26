@@ -14,7 +14,7 @@ from dino_cur import *
 
 # Global Variables
 DIRECTORY = ""
-FILE_NAME = "cubeTest"
+FILE_NAME = "nashAnnulus"
 D_BASECASE = False
 N_BASECASE = True
 CONSTITUTIVE_TYPE = 0
@@ -22,7 +22,7 @@ C_VALS = [2, 6]
 E_MOD = 200 
 NU = 0.20
 LOADSTEPS = 10
-NUM_PROCESSES = 4
+NUM_PROCESSES = 3
 ITERATIONS = 100
 TOLERANCE = 1e-4
 GP = np.array(
@@ -119,7 +119,7 @@ def main():
             # [X @ max X, Y @ max X, Z @ max X]
             'X': [None, None, None],
             'Y': [None, None, None],
-            'Z': [0, 0, 10]
+            'Z': [0, 0, 0.2]
         },
         'center': {
             # [X @ centre X, Y @ centre X, Z @ centre X]
