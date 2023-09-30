@@ -65,15 +65,15 @@ def dirichlet(np_n, bcs):
                 nodes.extend(np.where(condition_min)[0] * DIM + dim_idx)
 
             if max_bc[dim_idx] is not None:
-                # if dim_idx == 0 or dim_idx == 1:
-                #     # u[condition_max, dim_idx] = max_bc[dim_idx]
-                #     # Rotate the coordinates if there's a max_bc
-                #     rotated_coords = rotate_coordinates(np_n[condition_max, 1], np_n[condition_max, 2], np_n[condition_max, 3], 30)
-                #     u[condition_max, 1] = rotated_coords[0] - np_n[condition_max, 1]
-                #     u[condition_max, 2] = rotated_coords[1] - np_n[condition_max, 2]
-                # else:
-                #     u[condition_max, dim_idx] = max_bc[dim_idx]
-                u[condition_max, dim_idx] = max_bc[dim_idx]
+                if dim_idx == 0 or dim_idx == 1:
+                    # u[condition_max, dim_idx] = max_bc[dim_idx]
+                    # Rotate the coordinates if there's a max_bc
+                    rotated_coords = rotate_coordinates(np_n[condition_max, 1], np_n[condition_max, 2], np_n[condition_max, 3], 30)
+                    u[condition_max, 1] = rotated_coords[0] - np_n[condition_max, 1]
+                    u[condition_max, 2] = rotated_coords[1] - np_n[condition_max, 2]
+                else:
+                    u[condition_max, dim_idx] = max_bc[dim_idx]
+                # u[condition_max, dim_idx] = max_bc[dim_idx]
                 nodes.extend(np.where(condition_max)[0] * DIM + dim_idx)
 
             # if axi == 'Z' and cen_bc[dim_idx] is not None:

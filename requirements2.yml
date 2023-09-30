@@ -1,0 +1,11 @@
+name: phd
+channels:
+  - anaconda
+  - conda-forge
+  - defaults
+dependencies:
+  - meshio=5.3.4
+  - numpy=1.25.0
+  - numpy-base=1.25.0
+  - scipy=1.10.1
+  - matplotlib=3.7.1

@@ -15,6 +15,7 @@ from dino_cur import *
 # Global Variables
 DIRECTORY = ""
 FILE_NAME = "nashAnnulus"
+TEST_NAME = "AxialTwist_NashAnnulus"
 D_BASECASE = False
 N_BASECASE = True
 CONSTITUTIVE_TYPE = 0
@@ -153,8 +154,9 @@ def main():
                 f[DIM*i + 2] = f_vals[DIM*i + 2]
         #f = neumann(np_n, neu_bc)
 
-
     # ==== Newton Raphson ==== # 
+
+    output_log = open(TEST_NAME + '.txt', 'w')
     
     if LOADSTEPS:
         root_T = np.zeros(n_n*dim)
@@ -165,6 +167,7 @@ def main():
             np_n_step[:, 1:] += root.reshape(len(np_n), DIM)
             root, it = newton_raph(u_step, dir_n, f, np_n_step, np_e, n_ele, DEL_PHI, C_VALS, NUM_PROCESSES, ITERATIONS, TOLERANCE)
             root_T += root
+            output_log.write("Iteration Number: " + it + "\t Residual Value: " + root + "\n")
     else:
         root, it = newton_raph(u, dir_n, f, np_n, np_e, n_ele, DEL_PHI, C_VALS, NUM_PROCESSES, ITERATIONS, TOLERANCE)
         root_T = root
@@ -181,7 +184,7 @@ def main():
 
     # Convert result to vtk
     meshio.write_points_cells(
-        FILE_NAME + ".vtk", 
+        TEST_NAME + ".vtk", 
         np_n[:, 1:], 
         [("tetra10", vtk_e)] + [("tetra10", vtk_e)], 
         {"deformed": root_T.reshape(len(np_n), DIM) + np_n[:, 1:]}
