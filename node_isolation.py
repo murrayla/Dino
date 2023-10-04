@@ -1,4 +1,5 @@
 import numpy as np
+from itertools import permutations
 
 # [Note: ζ = 1 - ξ - η]
 # [
@@ -46,23 +47,29 @@ for x in range(0, ORD2D, 1):
 
 TET_FACE = np.array(
     [
-        [True, True, True, False],
-        [True, True, False, True],
-        [True, False, True, True],
-        [False, True, True, True]
+        [0, 1, 2],
+        [0, 1, 3],
+        [0, 2, 3],
+        [1, 2, 3]
     ]
 )
 
-TET_AREA = np.array(
+AREA = np.array(
     [0.5, 0.5, 0.5, 3**0.5 * (2**0.5)**2 / 4]
 )
 
+TET_AREA = {}
+
+for i, n_id in enumerate(TET_FACE):
+    for com in permutations(n_id):
+        TET_AREA[com] = AREA[i]
+
 TET_NORM = np.array(
     [
-        [0, 0, -1],
-        [0, -1, 0],
-        [-1, 0, 0],
-        [0, 0, 0]
+        -np.cross([1,0,0], [0,1,0]),
+        -np.cross([0,0,1], [1,0,0]),
+        -np.cross([0,1,0], [0,0,1]),
+        np.cross([-1,1,0], [-1,0,1])
     ]
 )
 
@@ -85,7 +92,7 @@ def simplex2D():
     mask = np.isin(earr_2D[:, 0], list(n_sur))
     earr_2D_filt = earr_2D[mask]
 
-    return earr_2D_filt
+    return earr_2D_filt, earr_2D
 
 def simplex3D(face_elems):
     nlis_3D = []
@@ -104,14 +111,23 @@ def simplex3D(face_elems):
                 elis_3D_filt.append(row_10)
                 e_n_filt.append([i, j])
 
-    return np.array(elis_3D_filt), np.array(e_n_filt)
+    return np.array(e_n_filt), earr_3D, narr_3D
 
 def main():
     # === Obtain 2D Face on Inside Cylinder Surface === #
-    face_elems = simplex2D()
+    face_elems, earr_2D = simplex2D()
 
     # === Obtain 3D Elements with 2D Faces Located Above === #
-    e_n_filt, e_n_filt = simplex3D(face_elems)
+    e_n_filt, earr_3D, narr_3D = simplex3D(face_elems)
+
+    # === Determine Node Positions === #
+    parr = []
+    f_area = []
+    f_norm = []
+    for i, j in e_n_filt:
+        idx = [np.where(earr_3D[i] == tf)[0][0] for tf in face_elems[j]][:3]
+        parr.append(idx)
+        f_area.append(TET_AREA[tuple(idx)])
 
 if __name__ == '__main__':
     main()
