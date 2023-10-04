@@ -44,7 +44,29 @@ for x in range(0, ORD2D, 1):
         ]
     )
 
-def inner_face():
+TET_FACE = np.array(
+    [
+        [True, True, True, False],
+        [True, True, False, True],
+        [True, False, True, True],
+        [False, True, True, True]
+    ]
+)
+
+TET_AREA = np.array(
+    [0.5, 0.5, 0.5, 3**0.5 * (2**0.5)**2 / 4]
+)
+
+TET_NORM = np.array(
+    [
+        [0, 0, -1],
+        [0, -1, 0],
+        [-1, 0, 0],
+        [0, 0, 0]
+    ]
+)
+
+def simplex2D():
     # === Obtain 2D Face on Inside Cylinder Surface === #
     nlis_2D = []
     el_2D = []
@@ -65,11 +87,7 @@ def inner_face():
 
     return earr_2D_filt
 
-def main():
-    # === Obtain 2D Face on Inside Cylinder Surface === #
-    face_elems = inner_face()
-
-    # === Obtain 3D Elements with 2D Faces Located Above === #
+def simplex3D(face_elems):
     nlis_3D = []
     elis_3D = []
     with open("runtime_files/nashAnnulus_cvt2dino.nodes", 'r') as node_3D:
@@ -79,14 +97,21 @@ def main():
     narr_3D = np.array(nlis_3D[1:]).astype(np.float64)
     earr_3D = np.array(elis_3D[1:])[:, 3:].astype(np.int32)
     elis_3D_filt = []
+    e_n_filt = []
     for i, row_10 in enumerate(earr_3D):
         for j, row_6 in enumerate(face_elems):
             if (all(item in row_10 for item in row_6)):
-                print("ROW 10: {}".format(row_10))
-                print("ROW 6: {}".format(row_6))
-    earr_3D_filt = np.array(elis_3D_filt)
+                elis_3D_filt.append(row_10)
+                e_n_filt.append([i, j])
 
-    # print(earr_3D_filt)
+    return np.array(elis_3D_filt), np.array(e_n_filt)
+
+def main():
+    # === Obtain 2D Face on Inside Cylinder Surface === #
+    face_elems = simplex2D()
+
+    # === Obtain 3D Elements with 2D Faces Located Above === #
+    e_n_filt, e_n_filt = simplex3D(face_elems)
 
 if __name__ == '__main__':
     main()
