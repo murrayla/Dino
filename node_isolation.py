@@ -1,27 +1,5 @@
 import numpy as np
 
-GP = np.array(
-    [
-        [1/3, 1/3], 
-        [0.6, 0.2],
-        [0.2, 0.6],
-        [0.2, 0.2]
-    ]
-)
-WE = np.array([-27/48, 25/48, 25/48, 25/48])
-ORDER = len(WE)
-
-#   η
-#   1  2                   
-#   |  |`\                 
-#   |  |  `\               
-#   |  5    `4             
-#   |  |      `\            
-#   |  |        `\          
-#   0  0-----3-----1
-#      0-----------1 ξ
-
-
 # [Note: ζ = 1 - ξ - η]
 # [
 #     φ0 = ξ * (2 * ξ - 1), 
@@ -32,60 +10,83 @@ ORDER = len(WE)
 #     φ5 = 4 * ζ * ξ
 # ] @ Gauss
 
-PHI = np.zeros((ORDER, 6))
+GP2D = np.array(
+    [
+        [1/3, 1/3], 
+        [0.6, 0.2],
+        [0.2, 0.6],
+        [0.2, 0.2]
+    ]
+)
+WE2D = np.array([-27/48, 25/48, 25/48, 25/48])
+ORD2D = len(WE2D)
+PHI2D = np.zeros((ORD2D, 6))
+DEL2D = np.zeros((ORD2D, 3, 6))
 
-# [
-#     δφ1/δξ δφ2/δξ ... δφ6/δξ
-#     δφ1/δη δφ2/δη ... δφ6/δη
-# ] @ Gauss
-
-DEL_PHI = np.zeros((ORDER, 2, 6))
-
-for x in range(0, ORDER, 1):
+for x in range(0, ORD2D, 1):
     # Shape Functions
-    PHI[x, :] = np.array(
+    PHI2D[x, :] = np.array(
         [
-            GP[x, 0] * (2 * GP[x, 0] - 1),        
-            GP[x, 1] * (2 * GP[x, 1] - 1),
-            (1 - GP[x, 0] - GP[x, 1]) * (2 * (1 - GP[x, 0] - GP[x, 1]) - 1),
-            4 * GP[x, 0] * GP[x, 1],
-            4 * GP[x, 1] * (1 - GP[x, 0] - GP[x, 1]),
-            4 * (1 - GP[x, 0] - GP[x, 1]) * GP[x, 0]
+            GP2D[x, 0] * (2 * GP2D[x, 0] - 1),        
+            GP2D[x, 1] * (2 * GP2D[x, 1] - 1),
+            (1 - GP2D[x, 0] - GP2D[x, 1]) * (2 * (1 - GP2D[x, 0] - GP2D[x, 1]) - 1),
+            4 * GP2D[x, 0] * GP2D[x, 1],
+            4 * GP2D[x, 1] * (1 - GP2D[x, 0] - GP2D[x, 1]),
+            4 * (1 - GP2D[x, 0] - GP2D[x, 1]) * GP2D[x, 0]
         ]
     )
     # Derivatives of shape functions
-    DEL_PHI[x, :, :] = np.array(
+    DEL2D[x, :, :] = np.array(
         [
-            [4*GP[x, 0] - 1, 0, 4*GP[x, 1] + 4*GP[x, 0] - 3, 4*GP[x, 1], -4*GP[x, 1], 4 - 8*GP[x, 0] - 4*GP[x, 1]], 
-            [0, 4*GP[x, 1] - 1, 4*GP[x, 1] + 4*GP[x, 0] - 3, 4*GP[x, 0], 4 - 8*GP[x, 1] - 4*GP[x, 0], -4*GP[x, 0]]
+            [4*GP2D[x, 0] - 1, 0, 4*GP2D[x, 1] + 4*GP2D[x, 0] - 3, 4*GP2D[x, 1], -4*GP2D[x, 1], 4 - 8*GP2D[x, 0] - 4*GP2D[x, 1]], 
+            [0, 4*GP2D[x, 1] - 1, 4*GP2D[x, 1] + 4*GP2D[x, 0] - 3, 4*GP2D[x, 0], 4 - 8*GP2D[x, 1] - 4*GP2D[x, 0], -4*GP2D[x, 0]],
+            [0, 0, 0, 0, 0, 0]
         ]
     )
 
-nodes = open("runtime_files/nashAnnulus2D_cvt2dino.nodes", 'r')
-elems = open("runtime_files/nashAnnulus2D_cvt2dino.ele", 'r')
-n_list = list()
-e_list = list()
+def inner_face():
+    # === Obtain 2D Face on Inside Cylinder Surface === #
+    nlis_2D = []
+    el_2D = []
+    with open("runtime_files/nashAnnulus2D_cvt2dino.nodes", 'r') as node_2D:
+        nlis_2D = [line.strip().split() for line in node_2D]
+    with open("runtime_files/nashAnnulus2D_cvt2dino.ele", 'r') as elem_2D:
+        el_2D = [line.strip().split() for line in elem_2D]
+    narr_2D = np.array(nlis_2D[1:]).astype(np.float64)
+    earr_2D = np.array(el_2D[1:])[:, 3:].astype(np.int32)
+    n_sur = []
+    for i, (x, y, _) in enumerate(narr_2D[:, 1:]):
+        vec = np.linalg.norm([x, y])
+        if abs(vec - 1) < 1e-5:
+            n_sur.append(i)
+    n_sur = set(n_sur)
+    mask = np.isin(earr_2D[:, 0], list(n_sur))
+    earr_2D_filt = earr_2D[mask]
 
-for line in nodes:
-    n_list.append(line.strip().replace('\t', ' ').split(' '))
-for line in elems:
-    e_list.append(line.strip().replace('\t', ' ').split(' '))
+    return earr_2D_filt
 
-np_n = np.array(n_list[1:]).astype(np.float64)
-np_e = np.array(e_list[1:])
-np_e = np_e[:, 3:].astype(np.int32)
-n_ele = len(np_e[:, 0])
-n_n = int(len(np_n[:, 0]))
-dim = 3
+def main():
+    # === Obtain 2D Face on Inside Cylinder Surface === #
+    face_elems = inner_face()
 
-n_sur = list()
+    # === Obtain 3D Elements with 2D Faces Located Above === #
+    nlis_3D = []
+    elis_3D = []
+    with open("runtime_files/nashAnnulus_cvt2dino.nodes", 'r') as node_3D:
+        nlis_3D = [line.strip().split() for line in node_3D]
+    with open("runtime_files/nashAnnulus_cvt2dino.ele", 'r') as elem_3D:
+        elis_3D = [line.strip().split() for line in elem_3D]
+    narr_3D = np.array(nlis_3D[1:]).astype(np.float64)
+    earr_3D = np.array(elis_3D[1:])[:, 3:].astype(np.int32)
+    elis_3D_filt = []
+    for i, row_10 in enumerate(earr_3D):
+        for j, row_6 in enumerate(face_elems):
+            if (all(item in row_10 for item in row_6)):
+                print("ROW 10: {}".format(row_10))
+                print("ROW 6: {}".format(row_6))
+    earr_3D_filt = np.array(elis_3D_filt)
 
-for i, (x, y, z) in enumerate(np_n[:, 1:]):
-    vecNorm = np.linalg.norm([x, y])
-    if abs(vecNorm - 1) < 1e-3:
-        n_sur.append(i)
+    # print(earr_3D_filt)
 
-n_sur = set(n_sur)
-mask = np.isin(np_e[:, 0], list(n_sur))
-filt_np_e = np_e[mask]
-
+if __name__ == '__main__':
+    main()
