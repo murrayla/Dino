@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.cm import get_cmap
 from functools import partial
 
-P_CHECK = True
+P_CHECK = False
 
 WE = np.array([-4/5, 9/20, 9/20, 9/20, 9/20])
 GP = np.array(
@@ -72,9 +72,8 @@ def rotate_coordinates(x, y, z, angle_degrees):
     # Perform the rotation about the z-axis using trigonometric functions
     new_x = x * math.cos(angle_radians) - y * math.sin(angle_radians)
     new_y = x * math.sin(angle_radians) + y * math.cos(angle_radians)
-    new_z = z
 
-    return new_x, new_y, new_z
+    return new_x, new_y, 0
 
 def dirichlet(np_n, bcs):
     # Initialize arrays to store displacement values and node numbers with BCs
@@ -87,54 +86,18 @@ def dirichlet(np_n, bcs):
         min_bc = bcs['min'][axi]
         max_bc = bcs['max'][axi]
 
-        condition_min = np_n[:, idx + 1] == np.min(np_n[:, idx + 1])
-        condition_max = np_n[:, idx + 1] == np.max(np_n[:, idx + 1])
-
-        # if axi == 'Z':
-        #     condition_cen = np.logical_and(np_n[:, 3] > 0.8, np_n[:,3] < 1.2)
-        #     cen_bc = bcs['center']['Z']
+        con_min = np_n[:, idx + 1] == np.min(np_n[:, idx + 1])
+        con_max = np_n[:, idx + 1] == np.max(np_n[:, idx + 1])
 
         for dim_idx in range(0, DIM, 1):
 
             if min_bc[dim_idx] is not None:
-                u[condition_min, dim_idx] = min_bc[dim_idx]
-                nodes.extend(np.where(condition_min)[0] * DIM + dim_idx)
+                u[con_min, dim_idx] = min_bc[dim_idx]
+                nodes.extend(np.where(con_min)[0] * DIM + dim_idx)
 
             if max_bc[dim_idx] is not None:
-                if dim_idx == 0 or dim_idx == 1:
-                    # u[condition_max, dim_idx] = max_bc[dim_idx]
-                    # Rotate the coordinates if there's a max_bc
-                    rotated_coords = rotate_coordinates(np_n[condition_max, 1], np_n[condition_max, 2], np_n[condition_max, 3], 30)
-                    u[condition_max, 1] = rotated_coords[0] - np_n[condition_max, 1]
-                    u[condition_max, 2] = rotated_coords[1] - np_n[condition_max, 2]
-                else:
-                    u[condition_max, dim_idx] = max_bc[dim_idx]
-                # u[condition_max, dim_idx] = max_bc[dim_idx]
-                nodes.extend(np.where(condition_max)[0] * DIM + dim_idx)
-
-            # if axi == 'Z' and cen_bc[dim_idx] is not None:
-            #     u[condition_min, dim_idx] = cen_bc[dim_idx]
-            #     nodes.extend(np.where(condition_min)[0] * DIM + dim_idx)
-
-    # Apply centre BCs
-
-     # Apply BCs
-    # for idx, axi in enumerate(['X', 'Y', 'Z']):
-
-    #     if axi == 'Z':
-    #         # cen_bc = bcs['center']['Z']
-    #         for idx in np.where((np_n[:, 3] >= 0.9) & (np_n[:, 3] <= 1.1))[0]:
-    #             vecNorm = np.linalg.norm([np_n[idx, 1], np_n[idx, 2]])
-    #             if abs(vecNorm - 0.8) < 1e-3:
-    #                 u[idx, 0] = np_n[idx, 1] / vecNorm * 0.02
-    #                 u[idx, 1] = np_n[idx, 2] / vecNorm * 0.02
-    #                 nodes.extend([DIM * idx + 0, DIM * idx + 1])
-
-        # for dim_idx in range(0, DIM, 1):
-
-        #     if axi == 'Z' and cen_bc[dim_idx] is not None:
-        #         u[condition_min, dim_idx] = cen_bc[dim_idx]
-        #         nodes.extend(np.where(condition_min)[0] * DIM + dim_idx)
+                u[con_max, dim_idx] = max_bc[dim_idx]
+                nodes.extend(np.where(con_max)[0] * DIM + dim_idx)
 
     u = u.flatten()
 
@@ -579,7 +542,7 @@ def newton_raph(u, dir_n, f, np_n, np_e, n_ele, dN, c_vals, num_pro, iters, tol)
 
         print("Sum of Squared (RESIDUAL): {}".format(SSR))
         print("Sum of Squared (DELTA): {}".format(SSU))
-        print("Iteration Number: {}".format(i))
+        print(" === Iteration Number: {}".format(i))
 
         if SSR < tol: # or SSU < tol:
             # plt.plot(rhs_sol)

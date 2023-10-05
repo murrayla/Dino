@@ -14,15 +14,15 @@ from dino_cur import *
 
 # Global Variables
 DIRECTORY = ""
-FILE_NAME = "nashAnnulus"
-TEST_NAME = "AxialTwist_NashAnnulus"
+FILE_NAME = "cubeTest"
+TEST_NAME = "cubeTestTwist"
 D_BASECASE = False
 N_BASECASE = True
 CONSTITUTIVE_TYPE = 0
 C_VALS = [2, 6] 
 E_MOD = 200 
 NU = 0.20
-LOADSTEPS = 10
+LOADSTEPS = 20
 NUM_PROCESSES = 1
 ITERATIONS = 100
 TOLERANCE = 1e-4
@@ -120,7 +120,7 @@ def main():
             # [X @ max X, Y @ max X, Z @ max X]
             'X': [None, None, None],
             'Y': [None, None, None],
-            'Z': [0, 0, 0.2]
+            'Z': [0, 0, 0.1]
         },
         'center': {
             # [X @ centre X, Y @ centre X, Z @ centre X]
@@ -157,17 +157,28 @@ def main():
     # ==== Newton Raphson ==== # 
 
     output_log = open(TEST_NAME + '.txt', 'w')
+
+    r = 30
     
     if LOADSTEPS:
         root_T = np.zeros(n_n*dim)
         root = np.zeros(n_n*dim)
         np_n_step = np.copy(np_n)
         u_step = u / LOADSTEPS
+        r_step = r / LOADSTEPS
         for i in range(0, LOADSTEPS, 1):
+            for n, (x, y, z) in enumerate(np_n[:, 1:]):
+                if z == 100:
+                    x_prime, y_prime, _ = rotate_coordinates(x, y, 0, r_step)
+                    u_step[n * DIM + 0] = x_prime - np_n[n, 1]
+                    u_step[n * DIM + 1] = y_prime - np_n[n, 2]
+            print("=====================".format(i))        
+            print("     LOADSTEP {}".format(i))
+            print("=====================".format(i))
             np_n_step[:, 1:] += root.reshape(len(np_n), DIM)
             root, it = newton_raph(u_step, dir_n, f, np_n_step, np_e, n_ele, DEL_PHI, C_VALS, NUM_PROCESSES, ITERATIONS, TOLERANCE)
             root_T += root
-            output_log.write("Iteration Number: " + it + "\t Residual Value: " + root + "\n")
+            output_log.write("Iteration Number: " + str(it) + "\t Residual Value: " + str(root) + "\n")
     else:
         root, it = newton_raph(u, dir_n, f, np_n, np_e, n_ele, DEL_PHI, C_VALS, NUM_PROCESSES, ITERATIONS, TOLERANCE)
         root_T = root
