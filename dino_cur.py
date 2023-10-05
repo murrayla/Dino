@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 from matplotlib.cm import get_cmap
 from functools import partial
 
+P_CHECK = True
+
 WE = np.array([-4/5, 9/20, 9/20, 9/20, 9/20])
 GP = np.array(
     [
@@ -27,6 +29,40 @@ TMAP = {
         (0,1): 3, (1,0): 3, (1,2): 4, 
         (2,1): 4, (2,0): 5, (0,2): 5
 }
+
+GP2D = np.array(
+    [
+        [1/3, 1/3], 
+        [0.6, 0.2],
+        [0.2, 0.6],
+        [0.2, 0.2]
+    ]
+)
+WE2D = np.array([-27/48, 25/48, 25/48, 25/48])
+ORD2D = len(WE2D)
+PHI2D = np.zeros((ORD2D, 6))
+DEL2D = np.zeros((ORD2D, 3, 6))
+
+for x in range(0, ORD2D, 1):
+    # Shape Functions
+    PHI2D[x, :] = np.array(
+        [
+            GP2D[x, 0] * (2 * GP2D[x, 0] - 1),        
+            GP2D[x, 1] * (2 * GP2D[x, 1] - 1),
+            (1 - GP2D[x, 0] - GP2D[x, 1]) * (2 * (1 - GP2D[x, 0] - GP2D[x, 1]) - 1),
+            4 * GP2D[x, 0] * GP2D[x, 1],
+            4 * GP2D[x, 1] * (1 - GP2D[x, 0] - GP2D[x, 1]),
+            4 * (1 - GP2D[x, 0] - GP2D[x, 1]) * GP2D[x, 0]
+        ]
+    )
+    # Derivatives of shape functions
+    DEL2D[x, :, :] = np.array(
+        [
+            [4*GP2D[x, 0] - 1, 0, 4*GP2D[x, 1] + 4*GP2D[x, 0] - 3, 4*GP2D[x, 1], -4*GP2D[x, 1], 4 - 8*GP2D[x, 0] - 4*GP2D[x, 1]], 
+            [0, 4*GP2D[x, 1] - 1, 4*GP2D[x, 1] + 4*GP2D[x, 0] - 3, 4*GP2D[x, 0], 4 - 8*GP2D[x, 1] - 4*GP2D[x, 0], -4*GP2D[x, 0]],
+            [0, 0, 0, 0, 0, 0]
+        ]
+    )
 
 
 def rotate_coordinates(x, y, z, angle_degrees):
@@ -391,6 +427,8 @@ def constitutive_eqs(e, c_vals, np_n, np_e, x, dN):
 
 def gauss_int(e, x, np_n, np_e, cau, bmat, dmat, kT, Fs, dN):
 
+    n_sur = np.loadtxt('runtime_files/surface_nodes.txt', dtype=int)
+
     # Number of nodes and deformed x
     n_n = int(len(np_n[:, 0]))
     xc = x.reshape(n_n, DIM)
@@ -410,6 +448,7 @@ def gauss_int(e, x, np_n, np_e, cau, bmat, dmat, kT, Fs, dN):
     Kab = np.zeros((DIM*N_EL_N, DIM*N_EL_N))
     Gab = np.zeros((N_EL_N, N_EL_N))
     Fa = np.zeros((N_EL_N*DIM, 1))
+    Pe = np.zeros((N_EL_N*DIM, 1))
 
     # ============================== #
     # Integration of Kab, Gab, Fa
@@ -437,7 +476,7 @@ def gauss_int(e, x, np_n, np_e, cau, bmat, dmat, kT, Fs, dN):
                 Gab[al, be] += np.matmul(
                     np.transpose(dNdxyz[:, al]), np.matmul(c[q, :, :], dNdxyz[:, be])
                 ) * w 
-                # Material Stiffness Km = ∫ BαT * DT * Bβ dv
+                # Material Stiffness Km = ∫ BαT * DT * Bβ sdv
                 Kab[DIM*al:DIM*al+DIM, DIM*be:DIM*be+DIM] += np.matmul(
                     np.matmul(
                         np.transpose(b[q, :, DIM*al:DIM*al+DIM]), d[q, :, :]
@@ -446,6 +485,15 @@ def gauss_int(e, x, np_n, np_e, cau, bmat, dmat, kT, Fs, dN):
             # Residual Fα = - ∫ BαTσ dv OR Fα = - ∫ σ * ∂Nα/∂x dv
             Fa[DIM*al:DIM*al+DIM] -= np.matmul(np.transpose(b[q, :, DIM*al:DIM*al+DIM]), voigt) * w
 
+    if P_CHECK:
+        for q, w in enumerate(WE2D):
+            p_ext = np.matmul(DEL2D[q, :, :], cur)
+            for al in range(6):
+                p = 1.5e3
+                if rc[al] in n_sur:
+                    Pe[DIM*al:DIM*al+DIM] += p * np.cross(p_ext[0, :], p_ext[1, :])
+
+    print(Pe)
     # ============================== #
     # Array allocation
     # ============================== #
@@ -460,7 +508,7 @@ def gauss_int(e, x, np_n, np_e, cau, bmat, dmat, kT, Fs, dN):
                 DIM*(rc[i]-1):DIM*(rc[i]-1)+DIM, DIM*(rc[j]-1):DIM*(rc[j]-1)+DIM
             ] += (Kab[DIM*i:DIM*i+DIM, DIM*j:DIM*j+DIM] + Gab[i, j] * I)
         # Allocate to Residual
-        Fs[DIM*(rc[i]-1):DIM*(rc[i]-1)+DIM] += Fa[DIM*i:DIM*i+3, 0]
+        Fs[DIM*(rc[i]-1):DIM*(rc[i]-1)+DIM] += Fa[DIM*i:DIM*i+3, 0] + Pe[DIM*i:DIM*i+3, 0]
 
     return Fs, kT
 
@@ -655,6 +703,7 @@ def plot_disps(np_n, np_e, u, n_ele, phi):
     plt.show()
 
 def plot_geo(np_n, np_e, u):
+
     plt.plot(u)
     plt.show()
     n_n    = int(len(np_n[:, 0]))
