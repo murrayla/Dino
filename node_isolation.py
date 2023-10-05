@@ -209,7 +209,8 @@ def main():
 
     # === Obtain 3D Elements with 2D Faces Located Above === #
     e_n_filt, earr_3D, narr_3D = simplex3D(face_elems)
-
+    np.savetxt('runtime_files/indexes_2D3D_match.txt', np.array(list(e_n_filt)), fmt='%d')
+    np.savetxt('runtime_files/face_elems.txt', np.array(list(face_elems)), fmt='%d')
     # === Determine Node Positions === #
     parr = []
     f_area = []

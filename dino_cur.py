@@ -428,6 +428,8 @@ def constitutive_eqs(e, c_vals, np_n, np_e, x, dN):
 def gauss_int(e, x, np_n, np_e, cau, bmat, dmat, kT, Fs, dN):
 
     n_sur = np.loadtxt('runtime_files/surface_nodes.txt', dtype=int)
+    ij_2D3D = np.loadtxt('runtime_files/indexes_2D3D_match.txt', dtype=int)
+    face_elems = np.loadtxt('runtime_files/face_elems.txt', dtype=int)
 
     # Number of nodes and deformed x
     n_n = int(len(np_n[:, 0]))
@@ -485,15 +487,20 @@ def gauss_int(e, x, np_n, np_e, cau, bmat, dmat, kT, Fs, dN):
             # Residual Fα = - ∫ BαTσ dv OR Fα = - ∫ σ * ∂Nα/∂x dv
             Fa[DIM*al:DIM*al+DIM] -= np.matmul(np.transpose(b[q, :, DIM*al:DIM*al+DIM]), voigt) * w
 
-    if P_CHECK:
+    cur2D = np.zeros((6, DIM))
+    if P_CHECK and e in ij_2D3D[0, :]:
+        idx = ij_2D3D[np.where(ij_2D3D[0, :] == e), 1]
+        ele = face_elems[idx][0]
+        for i, local_node in enumerate(ele[0]):
+            cur2D[i, :] = xc[np.where(n_idx == local_node), :][0]
         for q, w in enumerate(WE2D):
-            p_ext = np.matmul(DEL2D[q, :, :], cur)
+            p_ext = np.matmul(DEL2D[q, :, :], cur2D)
             for al in range(6):
                 p = 1.5e3
-                if rc[al] in n_sur:
-                    Pe[DIM*al:DIM*al+DIM] += p * np.cross(p_ext[0, :], p_ext[1, :])
+                x_prod = np.transpose(np.cross(p_ext[0, :], p_ext[1, :]))
+                Pe[DIM*al:DIM*al+DIM, 0] += p * x_prod * w
 
-    print(Pe)
+    # print(Pe)
     # ============================== #
     # Array allocation
     # ============================== #
