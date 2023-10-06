@@ -14,8 +14,8 @@ from dino_cur import *
 
 # Global Variables
 DIRECTORY = ""
-FILE_NAME = "cubeTest"
-TEST_NAME = "cubeTestTwist"
+FILE_NAME = "nashAnnulus"
+TEST_NAME = "Annulus_AxialTwistPressure"
 D_BASECASE = False
 N_BASECASE = True
 CONSTITUTIVE_TYPE = 0
@@ -23,7 +23,7 @@ C_VALS = [2, 6]
 E_MOD = 200 
 NU = 0.20
 LOADSTEPS = 20
-NUM_PROCESSES = 1
+NUM_PROCESSES = 8
 ITERATIONS = 100
 TOLERANCE = 1e-4
 GP = np.array(

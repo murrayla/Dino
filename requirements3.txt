@@ -1,8 +1,0 @@
-# This file may be used to create an environment using:
-# $ conda create --name <env> --file <this file>
-# platform: osx-arm64
-matplotlib=3.7.1
-meshio=5.3.4
-numpy=1.25.0
-numpy-base=1.25.0
-scipy=1.10.1
